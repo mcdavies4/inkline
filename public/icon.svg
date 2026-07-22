@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#0B1F17"/>
+  <!-- signature line -->
+  <path d="M120 360 C 200 336, 300 384, 392 352"
+        fill="none" stroke="#12E27A" stroke-width="20" stroke-linecap="round"/>
+  <!-- the 'I' stroke as a pen/ink mark -->
+  <rect x="238" y="130" width="36" height="180" rx="18" fill="#F4FFF9"/>
+  <circle cx="256" cy="118" r="26" fill="#12E27A"/>
+</svg>
