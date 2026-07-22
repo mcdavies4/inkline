@@ -170,9 +170,14 @@ async function deliverToSigner(
   // window — so it must be the primary, guaranteed path.
   let delivered = false;
 
+  // Small pause helper so WhatsApp delivers messages in the order we send them.
+  // Without this, template (one route) and freeform (another) can arrive out of
+  // order — the link showing before the "someone sent you a document" opener.
+  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // 1. TEMPLATE — the opener. Guaranteed delivery even to cold signers.
   if (template) {
     try {
-      // Body: "Hi, {{1}} has sent you a document to sign: {{2}}..."  (no button param)
       await sendTemplate(signer.phone_e164, template, [senderName, doc.filename]);
       delivered = true;
       await db.from("audit_events").insert({
@@ -181,23 +186,19 @@ async function deliverToSigner(
         event_type: "wa_sent",
         meta: { channel: "template" },
       });
+      await pause(1200);
     } catch (e) {
       console.error("deliverToSigner: template send failed —", e instanceof Error ? e.message : e);
     }
   }
 
-  // ENHANCEMENT: also send the actual link as freeform. Delivers only if the
-  // signer has an open window; harmless if not (template already notified them).
-  // The link is embedded directly in the text so it's ALWAYS tappable — we do
-  // NOT rely on interactive buttons ("tap below"), which can fail to render.
+  // 2. LINK MESSAGE — the actual tappable signing link (freeform; delivers if
+  //    the window is open). Sent after the opener so it arrives second.
   try {
     await sendText(
       signer.phone_e164,
       `${t("sign_cta_body", { name: signer.name.split(" ")[0] })}\n${signUrl}`
     );
-    if (signedUrl?.signedUrl) {
-      await sendDocument(signer.phone_e164, signedUrl.signedUrl, doc.filename).catch(() => {});
-    }
     if (!delivered) {
       delivered = true;
       await db.from("audit_events").insert({
@@ -206,6 +207,12 @@ async function deliverToSigner(
         event_type: "wa_sent",
         meta: { channel: "freeform" },
       });
+    }
+    await pause(1200);
+
+    // 3. DOCUMENT — the PDF to preview, last.
+    if (signedUrl?.signedUrl) {
+      await sendDocument(signer.phone_e164, signedUrl.signedUrl, doc.filename).catch(() => {});
     }
   } catch (e) {
     console.error("deliverToSigner: freeform enhancement failed (window likely closed) —", e instanceof Error ? e.message : e);
