@@ -226,6 +226,7 @@ async function handleText(from: string, profileName: string, text: string, waMes
     if (upper === "DASHBOARD") return void (await handleDashboard(from));
     if (upper === "BILLING" || upper === "SUBSCRIBE") return void (await handleBilling(from));
     if (upper === "ADMIN") return void (await handleAdmin(from));
+    if (upper === "ADMIN SENDERS" || upper === "ADMINSENDERS") return void (await handleAdminSenders(from));
     const tpl = await matchTemplate(upper);
     if (tpl) return void (await startTemplate(from, tpl));
     if (["YES", "APPROVE", "APPROVED", "I APPROVE"].includes(upper)) {
@@ -586,7 +587,7 @@ async function handleAdmin(from: string) {
       `   ✓ ${signed} completed (${rate}%)\n` +
       `   ⏳ ${pending.count ?? 0} awaiting signatures\n` +
       `   📅 ${docsToday.count ?? 0} today · ${docsWeek.count ?? 0} this week\n\n` +
-      `✍️ Signers: ${signedSigners.count ?? 0}/${signersAll.count ?? 0} signed`
+      `✍️ Signers: ${signedSigners.count ?? 0}/${signersAll.count ?? 0} signed\n\n_Reply ADMIN SENDERS to see who's sent._`
   );
 }
 
@@ -636,4 +637,54 @@ async function maybeSendPendingSignerLink(from: string): Promise<boolean> {
     .from("audit_events")
     .insert({ request_id: signer.request_id, signer_id: signer.id, event_type: "link_resent_on_reply", meta: {} });
   return true;
+}
+
+/** ADMIN SENDERS — owner-only list of who has sent documents. */
+async function handleAdminSenders(from: string) {
+  const admin = (process.env.ADMIN_PHONE ?? "").replace(/[^\d]/g, "");
+  if (!admin || from !== admin) {
+    await sendText(from, t("bot_intro"));
+    return;
+  }
+
+  const db = supabaseAdmin();
+  const { data: rows } = await db
+    .from("sign_requests")
+    .select("sender_name, sender_phone, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (!rows || rows.length === 0) {
+    await sendText(from, "No documents have been sent yet.");
+    return;
+  }
+
+  // Aggregate by sender.
+  const bySender = new Map<string, { name: string; count: number; last: string }>();
+  for (const r of rows) {
+    const key = r.sender_phone ?? "unknown";
+    const existing = bySender.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      bySender.set(key, {
+        name: r.sender_name ?? "Unknown",
+        count: 1,
+        last: (r.created_at ?? "").slice(0, 10),
+      });
+    }
+  }
+
+  const lines = Array.from(bySender.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 30)
+    .map(([phone, s], i) => {
+      const you = phone === admin ? " (you)" : "";
+      return `${i + 1}. ${s.name}${you}\n   ${phone} · ${s.count} doc${s.count === 1 ? "" : "s"} · last ${s.last}`;
+    });
+
+  await sendText(
+    from,
+    `👥 *Senders* (${bySender.size} total)\n\n${lines.join("\n\n")}`
+  );
 }
