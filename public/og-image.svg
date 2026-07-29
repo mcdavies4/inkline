@@ -1,0 +1,63 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A1A14"/>
+      <stop offset="100%" stop-color="#061410"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- LEFT: wordmark + headline -->
+  <text x="72" y="112" font-family="Arial, Helvetica, sans-serif" font-weight="900"
+        font-size="42" letter-spacing="-2" fill="#F6FFFA">Inkline</text>
+  <circle cx="228" cy="98" r="8" fill="#12E27A"/>
+
+  <text x="72" y="278" font-family="Arial, Helvetica, sans-serif" font-weight="900"
+        font-size="78" letter-spacing="-4" fill="#F6FFFA">Get it</text>
+  <text x="72" y="360" font-family="Arial, Helvetica, sans-serif" font-weight="900"
+        font-size="78" letter-spacing="-4" fill="#12E27A">signed</text>
+  <text x="72" y="442" font-family="Arial, Helvetica, sans-serif" font-weight="900"
+        font-size="78" letter-spacing="-4" fill="#F6FFFA">in the chat.</text>
+
+  <path d="M76 466 C 190 448, 330 490, 470 458" fill="none" stroke="#12E27A"
+        stroke-width="8" stroke-linecap="round"/>
+
+  <text x="72" y="532" font-family="Arial, Helvetica, sans-serif" font-weight="700"
+        font-size="24" fill="#12E27A">e-signatures over Telegram</text>
+  <text x="72" y="570" font-family="Arial, Helvetica, sans-serif" font-weight="500"
+        font-size="22" fill="#F6FFFA" opacity="0.5">No app · no account · about 20 seconds</text>
+
+  <!-- RIGHT: chat mockup -->
+  <g transform="translate(690,86)">
+    <rect x="0" y="0" width="440" height="458" rx="30" fill="#0E241B" stroke="#1B3A2D" stroke-width="2"/>
+
+    <!-- header -->
+    <circle cx="46" cy="48" r="19" fill="#229ED9"/>
+    <text x="46" y="55" text-anchor="middle" font-family="Arial" font-weight="900" font-size="17" fill="#FFFFFF">I</text>
+    <text x="78" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="19" fill="#F6FFFA">Inkline</text>
+    <text x="78" y="66" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="13" fill="#12E27A">bot</text>
+    <line x1="24" y1="88" x2="416" y2="88" stroke="#1B3A2D" stroke-width="2"/>
+
+    <!-- them: pdf -->
+    <rect x="150" y="112" width="266" height="58" rx="16" fill="#DCF8C6"/>
+    <rect x="168" y="128" width="46" height="26" rx="6" fill="#0A1A14"/>
+    <text x="191" y="146" text-anchor="middle" font-family="Arial" font-weight="900" font-size="12" fill="#FFFFFF">PDF</text>
+    <text x="226" y="147" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="16" fill="#0A1A14">contract.pdf</text>
+
+    <!-- bot -->
+    <rect x="24" y="186" width="256" height="52" rx="16" fill="#FFFFFF"/>
+    <text x="44" y="218" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="16" fill="#0A1A14">Got it. Who&#8217;s signing?</text>
+
+    <!-- them -->
+    <rect x="196" y="254" width="220" height="52" rx="16" fill="#DCF8C6"/>
+    <text x="216" y="286" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="16" fill="#0A1A14">James Carter</text>
+
+    <!-- signed -->
+    <rect x="24" y="322" width="310" height="92" rx="16" fill="#12E27A"/>
+    <rect x="44" y="342" width="40" height="28" rx="7" fill="#0B6B4F"/>
+    <text x="64" y="362" text-anchor="middle" font-family="Arial" font-weight="900" font-size="16" fill="#FFFFFF">&#10003;</text>
+    <text x="96" y="363" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="17" fill="#0A1A14">signed.pdf</text>
+    <text x="44" y="396" font-family="Arial, Helvetica, sans-serif" font-weight="500" font-size="14" fill="#0B6B4F">Certificate attached · 20s</text>
+  </g>
+</svg>
