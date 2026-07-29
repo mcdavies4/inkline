@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SignatureField from "./SignatureField";
+import TelegramSignFix from "./TelegramSignFix";
 
 type Field = {
   id: string;
@@ -130,6 +131,7 @@ export default function PlacementSign(props: Props) {
   return (
     <main className="wrap">
       <header className="brand">Inkline</header>
+      <TelegramSignFix />
       <div className="card">
         <p className="eyebrow">{props.senderName} asks you to sign</p>
         <h1>{props.filename}</h1>

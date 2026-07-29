@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import PlacementSign from "./PlacementSign";
 import SignatureField from "./SignatureField";
+import TelegramSignFix from "./TelegramSignFix";
 
 type PlacedField = {
   id: string;
@@ -156,6 +157,7 @@ export default function SignPage() {
   return (
     <main className="wrap">
       <header className="brand">Inkline</header>
+      <TelegramSignFix />
 
       <div className="card">
         <p className="eyebrow">{data.senderName} asks you to sign</p>
