@@ -168,9 +168,10 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
       document_id: data.document_id,
       sender_name: fromName,
       sender_chat_id: chatId,
-      mode: "single",          // NOT NULL in your schema (was "signing_flow" — wrong)
-      status: "pending",
-      placement: upper === "PLACE" ? "pending" : "none",
+      mode: "signature",       // allowed: 'signature' | 'quick_approval'
+      signing_flow: "single",  // allowed: 'single' | 'sequential' | 'parallel'
+      status: "pending",       // allowed: 'pending' | 'in_progress' | ...
+      placement: upper === "PLACE" ? "pending" : "none",  // allowed: 'none' | 'pending' | 'done'
     })
     .select()
     .single();
@@ -267,7 +268,8 @@ async function canSend(chatId: string): Promise<{ ok: boolean; used: number; lim
       tg_chat_id: chatId,
       documents_used: 0,
       free_limit: 3,
-      plan: "free",
+      plan: "free",        // allowed: 'free' | 'active' | 'past_due' | 'cancelled'
+      provider: "stripe",  // allowed: 'stripe' | 'flutterwave' (required by check)
     });
     return { ok: true, used: 0, limit: 3 };
   }
