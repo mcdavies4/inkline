@@ -110,7 +110,7 @@ export default function LandingChat() {
             <li>Tamper-evident SHA-256 fingerprint</li>
             <li>Full audit trail on every document</li>
             <li>Certificate page appended automatically</li>
-            <li>eIDAS-recognised electronic signature</li>
+            <li>Legally recognised electronic signatures</li>
           </ul>
         </div>
         <div className="cert">

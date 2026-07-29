@@ -218,7 +218,7 @@ export default function SignPage() {
       )}
 
       <footer className="foot">
-        Signed copies delivered to all parties · eIDAS-recognised
+        Signed copies delivered to all parties · legally recognised e-signatures
         <br />
         <a href="/terms" target="_blank" rel="noreferrer">Terms</a> · <a href="/privacy" target="_blank" rel="noreferrer">Privacy</a>
       </footer>
