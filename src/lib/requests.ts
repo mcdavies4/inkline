@@ -243,7 +243,7 @@ export async function advanceAfterSignature(requestId: string): Promise<{ allDon
     .order("sign_order", { ascending: true });
   if (!signers) return { allDone: false };
 
-  const remaining = signers.filter((s) => s.status !== "signed");
+  const remaining = (signers as { id: string; name: string; status: string; sign_order: number; sign_token: string; signer_chat_id?: string | null }[]).filter((s) => s.status !== "signed");
 
   if (remaining.length === 0) {
     await db
@@ -271,7 +271,7 @@ export async function advanceAfterSignature(requestId: string): Promise<{ allDon
 
   // Progress ping to the sender.
   if (request.sender_chat_id) {
-    const justSigned = signers.find((s) => s.status === "signed");
+    const justSigned = (signers as { name: string; status: string }[]).find((s) => s.status === "signed");
     await sendText(
       request.sender_chat_id,
       t("sign_sender_progress", {
