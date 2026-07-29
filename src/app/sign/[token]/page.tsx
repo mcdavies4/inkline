@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import PlacementSign from "./PlacementSign";
+import SignatureField from "./SignatureField";
 
 type PlacedField = {
   id: string;
@@ -34,15 +35,14 @@ export default function SignPage() {
   const [data, setData] = useState<SignData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
-  const [hasInk, setHasInk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpInput, setOtpInput] = useState("");
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
+  // Smooth signature pad gives us a PNG data URL (or null when cleared).
+  const [signaturePng, setSignaturePng] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/sign/${token}`)
@@ -60,60 +60,6 @@ export default function SignPage() {
       })
       .catch((e) => setError(e.message));
   }, [token]);
-
-  const canSign = data && !data.requireOtp || otpVerified;
-
-  useEffect(() => {
-    const c = canvasRef.current;
-    if (!c || done || waiting || !canSign) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = c.getBoundingClientRect();
-    c.width = rect.width * dpr;
-    c.height = rect.height * dpr;
-    const ctx = c.getContext("2d")!;
-    ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#1a2238";
-
-    const pos = (e: PointerEvent) => {
-      const r = c.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-    const down = (e: PointerEvent) => {
-      e.preventDefault();
-      drawing.current = true;
-      const p = pos(e);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-    };
-    const move = (e: PointerEvent) => {
-      if (!drawing.current) return;
-      e.preventDefault();
-      const p = pos(e);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-      setHasInk(true);
-    };
-    const up = () => (drawing.current = false);
-
-    c.addEventListener("pointerdown", down);
-    c.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      c.removeEventListener("pointerdown", down);
-      c.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [data, done, waiting, canSign]);
-
-  const clear = () => {
-    const c = canvasRef.current;
-    if (!c) return;
-    c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
-    setHasInk(false);
-  };
 
   const verifyOtp = async () => {
     setBusy(true);
@@ -135,14 +81,14 @@ export default function SignPage() {
   };
 
   const submit = async () => {
-    if (!canvasRef.current || busy) return;
+    if (!signaturePng || busy) return;
     setBusy(true);
     setError(null);
     try {
       const r = await fetch(`/api/sign/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signaturePng: canvasRef.current.toDataURL("image/png") }),
+        body: JSON.stringify({ signaturePng }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Signing failed. Please try again.");
@@ -170,7 +116,7 @@ export default function SignPage() {
         <div className="card center">
           <div className="tick">✓</div>
           <h1>Signed and sealed</h1>
-          <p className="mute">Your signed copy of <strong>{data.filename}</strong> is on its way to your WhatsApp, certificate included.</p>
+          <p className="mute">Your signed copy of <strong>{data.filename}</strong> is on its way to your Telegram, certificate included.</p>
           {downloadUrl && <a className="doclink" href={downloadUrl} target="_blank" rel="noreferrer">Download your signed copy ↗</a>}
         </div>
       </main>
@@ -214,7 +160,7 @@ export default function SignPage() {
       <div className="card">
         <p className="eyebrow">{data.senderName} asks you to sign</p>
         <h1>{data.filename}</h1>
-        {data.message && <p className="note">"{data.message}"</p>}
+        {data.message && <p className="note">&quot;{data.message}&quot;</p>}
         {data.pdfUrl && <a className="doclink" href={data.pdfUrl} target="_blank" rel="noreferrer">Read the document ↗</a>}
       </div>
 
@@ -228,8 +174,8 @@ export default function SignPage() {
 
       {data.requireOtp && !otpVerified ? (
         <div className="card">
-          <p className="eyebrow">Verify it's you</p>
-          <p className="mute" style={{ marginBottom: 12 }}>Enter the 6-digit code we sent to your WhatsApp.</p>
+          <p className="eyebrow">Verify it&apos;s you</p>
+          <p className="mute" style={{ marginBottom: 12 }}>Enter the 6-digit code we sent you on Telegram.</p>
           <input
             className="otp-input"
             inputMode="numeric"
@@ -246,14 +192,15 @@ export default function SignPage() {
       ) : (
         <div className="card">
           <p className="eyebrow">Sign with your finger</p>
-          <div className="sigbox">
-            <canvas ref={canvasRef} className="sigcanvas" />
-            <div className="sigline">
-              <span className="x">✕</span>
-              <span className="who">{data.signerName}</span>
-            </div>
+
+          {/* Smooth signature pad — replaces the old hand-rolled canvas.
+              Returns the same PNG data URL the old canvas.toDataURL() gave. */}
+          <SignatureField onChange={setSignaturePng} height={220} penColor="#1a2238" />
+
+          <div className="sigline" style={{ marginTop: 4 }}>
+            <span className="x">✕</span>
+            <span className="who">{data.signerName}</span>
           </div>
-          <button className="ghost" onClick={clear} disabled={!hasInk}>Start again</button>
 
           <label className="consent">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
@@ -262,14 +209,14 @@ export default function SignPage() {
 
           {error && <p className="err">{error}</p>}
 
-          <button className="primary" onClick={submit} disabled={!hasInk || !consent || busy}>
+          <button className="primary" onClick={submit} disabled={!signaturePng || !consent || busy}>
             {busy ? "Sealing your document…" : "Sign document"}
           </button>
         </div>
       )}
 
       <footer className="foot">
-        Verified via WhatsApp · Signed copies delivered to all parties · eIDAS-recognised
+        Signed copies delivered to all parties · eIDAS-recognised
         <br />
         <a href="/terms" target="_blank" rel="noreferrer">Terms</a> · <a href="/privacy" target="_blank" rel="noreferrer">Privacy</a>
       </footer>
