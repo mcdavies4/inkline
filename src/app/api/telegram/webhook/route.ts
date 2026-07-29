@@ -195,13 +195,19 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
   if (upper === "PLACE") {
     const placeToken = randomToken();
     await supa.from("placement_tokens").insert({ token: placeToken, request_id: request.id });
+    await supa.from("sign_requests").update({ sender_chat_id: chatId }).eq("id", request.id);
     await clearSession(chatId);
+    // Give the editor link first...
     await sendCtaLink(
       chatId,
-      `Place the fields, then I'll give you a link to send <b>${data.signer_name}</b>.`,
+      `Position the signature fields for <b>${data.signer_name}</b>, then tap Done in the editor.`,
       "Open placement editor",
       `${BASE}/place/${placeToken}`
     );
+    // ...then immediately hand over the share link too, so the flow never dead-ends.
+    // (The signer's page shows whatever fields exist when they open it, so you can
+    // place fields and forward the link in either order.)
+    await shareSignerLink(chatId, data.signer_name, signToken);
     return;
   }
 
