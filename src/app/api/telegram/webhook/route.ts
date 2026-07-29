@@ -68,6 +68,7 @@ async function handleMessage(msg: Record<string, any>) {
   }
   if (upper === "ADMIN") return handleAdmin(chatId);
   if (upper === "BILLING" || upper === "SUBSCRIBE") return handleBilling(chatId);
+  if (upper === "STATUS") return handleStatus(chatId);
 
   // ---- Inbound document (the sender's PDF) ----
   if (msg.document) {
@@ -139,7 +140,18 @@ async function handleDocument(chatId: string, fromName: string, document: Record
     return sendText(chatId, `Couldn't register the document — ${docErr.message ?? "unknown error"}. Please try again.`);
   }
 
-  await setSession(chatId, "awaiting_signer_name", { document_id: doc.id, filename });
+  // Generate the plain-English summary now (best effort) so it can be attached
+  // to the request and shown on the signer's page.
+  let aiSummary: string | null = null;
+  try {
+    const { extractPdfText } = await import("@/lib/doctext");
+    const { summariseDocument } = await import("@/lib/summary");
+    aiSummary = await summariseDocument(await extractPdfText(new Uint8Array(bytes)));
+  } catch (e) {
+    console.error("summary skipped:", e instanceof Error ? e.message : e);
+  }
+
+  await setSession(chatId, "awaiting_signer_name", { document_id: doc.id, filename, ai_summary: aiSummary });
   await sendText(
     chatId,
     `<b>${filename}</b> received.\n\nWho's signing it? Send me their name (just so it appears on the certificate).`
@@ -174,6 +186,7 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
       sender_chat_id: chatId,
       mode: "signature",       // allowed: 'signature' | 'quick_approval'
       signing_flow: "single",  // allowed: 'single' | 'sequential' | 'parallel'
+      ai_summary: data.ai_summary ?? null,
       status: "pending",       // allowed: 'pending' | 'in_progress' | ...
       placement: upper === "PLACE" ? "pending" : "none",  // allowed: 'none' | 'pending' | 'done'
     })
@@ -405,6 +418,37 @@ function helpText(): string {
     `<b>Inkline — help</b>\n\n` +
     `📎 Send a PDF, tell me who's signing, and I'll give you a link to forward to them.\n` +
     `They tap it, sign in ~20 seconds, and you both get the certified copy back here.\n\n` +
-    `Commands: HELP · CANCEL`
+    `Commands: HELP · STATUS · BILLING · CANCEL`
   );
+}
+
+/** STATUS — the sender's documents still awaiting signatures. */
+async function handleStatus(chatId: string) {
+  const supa = db();
+  const { data: reqs } = await supa
+    .from("sign_requests")
+    .select("id, status, created_at, documents(filename), signers(name, status, sign_token)")
+    .eq("sender_chat_id", chatId)
+    .in("status", ["pending", "in_progress"])
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const rows = (reqs ?? []) as unknown as {
+    id: string;
+    documents: { filename: string } | null;
+    signers: { name: string; status: string; sign_token: string }[];
+  }[];
+
+  if (rows.length === 0) {
+    return sendText(chatId, "Nothing waiting on signatures right now 👌\n\nSend me a PDF to start one.");
+  }
+
+  const lines = rows.map((r) => {
+    const signed = r.signers.filter((s) => s.status === "signed").length;
+    const pending = r.signers.find((s) => s.status !== "signed");
+    const link = pending ? `\n   ↳ resend: https://t.me/${BOT}?start=sign_${pending.sign_token}` : "";
+    return `📄 <b>${r.documents?.filename ?? "document"}</b>\n   ${signed}/${r.signers.length} signed · ref ${r.id.slice(0, 8)}${link}`;
+  });
+
+  await sendText(chatId, `<b>Awaiting signatures</b>\n\n${lines.join("\n\n")}`);
 }
