@@ -67,6 +67,7 @@ async function handleMessage(msg: Record<string, any>) {
     return sendText(chatId, "Okay, cleared. Send a PDF whenever you're ready.");
   }
   if (upper === "ADMIN") return handleAdmin(chatId);
+  if (upper === "BILLING" || upper === "SUBSCRIBE") return handleBilling(chatId);
 
   // ---- Inbound document (the sender's PDF) ----
   if (msg.document) {
@@ -77,6 +78,9 @@ async function handleMessage(msg: Record<string, any>) {
   const session = await getSession(chatId);
   if (session?.state === "awaiting_signer_name") {
     return onSignerName(chatId, fromName, text, session);
+  }
+  if (session?.state === "awaiting_plan") {
+    return handlePlanChoice(chatId, upper);
   }
   if (session?.state === "awaiting_placement") {
     return onPlacementChoice(chatId, fromName, upper, session);
@@ -265,7 +269,7 @@ async function startSigner(chatId: string, fromName: string, signToken: string) 
 // ============================================================
 async function canSend(chatId: string): Promise<{ ok: boolean; used: number; limit: number }> {
   const supa = db();
-  const { data } = await supa.from("accounts").select("*").eq("tg_chat_id", chatId).maybeSingle();
+  const { data } = await supa.from("accounts").select("*").eq("phone_e164", `tg:${chatId}`).maybeSingle();
   if (!data) {
     // accounts.phone_e164 is the NOT NULL primary key. Telegram has no phone, so
     // store a tg: marker as the key and keep the chat_id in tg_chat_id too.
@@ -285,21 +289,61 @@ async function canSend(chatId: string): Promise<{ ok: boolean; used: number; lim
 
 async function recordDocumentSent(chatId: string) {
   const supa = db();
-  const { data } = await supa.from("accounts").select("documents_used").eq("tg_chat_id", chatId).maybeSingle();
+  const { data } = await supa.from("accounts").select("documents_used").eq("phone_e164", `tg:${chatId}`).maybeSingle();
   await supa
     .from("accounts")
     .update({ documents_used: (data?.documents_used ?? 0) + 1 })
-    .eq("tg_chat_id", chatId);
+    .eq("phone_e164", `tg:${chatId}`);
 }
 
 async function sendPaywall(chatId: string) {
-  // Stripe checkout link generation stays the same as your web billing — point
-  // them to a checkout page keyed by chat_id, or reuse createStripeCheckout.
+  await setSession(chatId, "awaiting_plan", {});
   await sendText(
     chatId,
-    `You've used your 3 free documents 🎉\n\nGo unlimited for $9/month:\n${BASE}/billing?u=${chatId}\n\n` +
-      `Once you're subscribed, send your document again.`
+    `You've used your 3 free documents 🎉\n\nGo unlimited with Inkline:\n\n` +
+      `💳 <b>MONTHLY</b> — $9/month\n💳 <b>ANNUAL</b> — $90/year (2 months free)\n\n` +
+      `Reply MONTHLY or ANNUAL to subscribe.`
   );
+}
+
+/** MONTHLY / ANNUAL reply -> real Stripe Checkout link. */
+async function handlePlanChoice(chatId: string, upper: string) {
+  if (upper !== "MONTHLY" && upper !== "ANNUAL") {
+    return sendText(chatId, "Reply MONTHLY or ANNUAL to choose a plan, or CANCEL.");
+  }
+  const plan = upper === "ANNUAL" ? "annual" : "monthly";
+  const { createStripeCheckout } = await import("@/lib/billing");
+  // Accounts are keyed by phone_e164; for Telegram that key is `tg:<chatId>`.
+  const url = await createStripeCheckout(`tg:${chatId}`, plan);
+  await clearSession(chatId);
+  if (!url) {
+    return sendText(chatId, "Couldn't open checkout just now — please try again shortly.");
+  }
+  await sendCtaLink(
+    chatId,
+    `Complete your ${plan} subscription, then come back and send your document.`,
+    "Subscribe securely",
+    url
+  );
+}
+
+/** BILLING command — portal for subscribers, plans for everyone else. */
+async function handleBilling(chatId: string) {
+  const { getAccount, createStripePortal } = await import("@/lib/billing");
+  const account = await getAccount(`tg:${chatId}`);
+  if ((account.plan === "active" || account.plan === "past_due") && account.stripe_customer_id) {
+    const portal = await createStripePortal(`tg:${chatId}`);
+    if (portal) {
+      return sendCtaLink(
+        chatId,
+        "Manage your subscription — update your card, view invoices, or cancel.",
+        "Open billing portal",
+        portal
+      );
+    }
+    return sendText(chatId, "Couldn't open your billing page just now — please try again shortly.");
+  }
+  return sendPaywall(chatId);
 }
 
 // ============================================================
