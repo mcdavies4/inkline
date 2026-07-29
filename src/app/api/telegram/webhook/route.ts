@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
 async function handleMessage(msg: Record<string, any>) {
   const chatId = String(msg.chat?.id ?? "");
   if (!chatId) return;
+  // Only operate in private chats — a group would otherwise be treated as a user.
+  if (msg.chat?.type && msg.chat.type !== "private") return;
   const fromName =
     [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(" ") || "there";
   const text: string = (msg.text ?? "").trim();
@@ -73,6 +75,12 @@ async function handleMessage(msg: Record<string, any>) {
   // ---- Inbound document (the sender's PDF) ----
   if (msg.document) {
     return handleDocument(chatId, fromName, msg.document);
+  }
+  if (msg.photo) {
+    return sendText(
+      chatId,
+      "That came through as a photo, which I can't sign. Send the document as a <b>file</b> instead — in Telegram, tap 📎 → File → choose the PDF."
+    );
   }
 
   // ---- Session-driven text steps ----
@@ -248,7 +256,7 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
   const rows = signerList.map((sgr, i) => ({
     request_id: request.id,
     name: sgr.name,
-    phone_e164: `tg:${chatId}:${i + 1}`,  // NOT NULL in your schema; no phone on Telegram
+    phone_e164: `tg:${chatId}:${randomToken().slice(0, 10)}`,  // NOT NULL; unique per signer
     sign_token: i === 0 ? signToken : randomToken(),
     sign_order: i + 1,
     status: "pending",
@@ -459,10 +467,23 @@ async function handleAdmin(chatId: string) {
 // ============================================================
 // Sessions (simple table keyed by chat_id)
 // ============================================================
+const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 async function getSession(chatId: string): Promise<{ state: string; data: any } | null> {
   const supa = db();
-  const { data } = await supa.from("tg_sessions").select("state, data").eq("chat_id", chatId).maybeSingle();
-  return data ?? null;
+  const { data } = await supa
+    .from("tg_sessions")
+    .select("state, data, updated_at")
+    .eq("chat_id", chatId)
+    .maybeSingle();
+  if (!data) return null;
+  // Expire stale sessions so an old half-finished flow doesn't swallow a new
+  // message (e.g. "hi" being read as a signer's name a day later).
+  if (data.updated_at && Date.now() - new Date(data.updated_at).getTime() > SESSION_TTL_MS) {
+    await clearSession(chatId);
+    return null;
+  }
+  return data;
 }
 async function setSession(chatId: string, state: string, data: any) {
   const supa = db();
