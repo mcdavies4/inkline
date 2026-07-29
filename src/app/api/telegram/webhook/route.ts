@@ -119,14 +119,20 @@ async function handleDocument(chatId: string, fromName: string, document: Record
     return sendText(chatId, "Something went wrong saving that file — please try again.");
   }
 
+  // Compute a real sha256 (some schemas require a non-empty hash).
+  const { createHash } = await import("crypto");
+  const sha = createHash("sha256").update(bytes).digest("hex");
+
   const { data: doc, error: docErr } = await supa
     .from("documents")
-    .insert({ storage_path: path, filename, sha256: "" })
+    .insert({ storage_path: path, filename, sha256: sha, size_bytes: bytes.length })
     .select()
     .single();
   if (docErr) {
-    console.error("doc insert:", docErr.message);
-    return sendText(chatId, "Couldn't register the document — please try again.");
+    // Log the FULL error so the exact cause (missing column, constraint, etc.)
+    // shows in Vercel logs instead of a vague message.
+    console.error("doc insert failed:", JSON.stringify(docErr));
+    return sendText(chatId, `Couldn't register the document — ${docErr.message ?? "unknown error"}. Please try again.`);
   }
 
   await setSession(chatId, "awaiting_signer_name", { document_id: doc.id, filename });
@@ -161,21 +167,22 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
     .insert({
       document_id: data.document_id,
       sender_name: fromName,
-      sender_chat_id: chatId, // NB: add this column (see notes)
-      signing_flow: "single",
+      sender_chat_id: chatId,
+      mode: "single",          // NOT NULL in your schema (was "signing_flow" — wrong)
       status: "pending",
       placement: upper === "PLACE" ? "pending" : "none",
     })
     .select()
     .single();
   if (reqErr) {
-    console.error("request insert:", reqErr.message);
-    return sendText(chatId, "Something went wrong — reply RESTART to try again.");
+    console.error("request insert:", JSON.stringify(reqErr));
+    return sendText(chatId, `Couldn't create the request — ${reqErr.message ?? "error"}. Reply RESTART.`);
   }
 
   await supa.from("signers").insert({
     request_id: request.id,
     name: data.signer_name,
+    phone_e164: `tg:${chatId}`,  // NOT NULL in your schema; no phone on Telegram, so store a tg: marker
     sign_token: signToken,
     sign_order: 1,
     status: "pending",
@@ -253,7 +260,15 @@ async function canSend(chatId: string): Promise<{ ok: boolean; used: number; lim
   const supa = db();
   const { data } = await supa.from("accounts").select("*").eq("tg_chat_id", chatId).maybeSingle();
   if (!data) {
-    await supa.from("accounts").insert({ tg_chat_id: chatId, documents_used: 0, free_limit: 3, plan: "free" });
+    // accounts.phone_e164 is the NOT NULL primary key. Telegram has no phone, so
+    // store a tg: marker as the key and keep the chat_id in tg_chat_id too.
+    await supa.from("accounts").insert({
+      phone_e164: `tg:${chatId}`,
+      tg_chat_id: chatId,
+      documents_used: 0,
+      free_limit: 3,
+      plan: "free",
+    });
     return { ok: true, used: 0, limit: 3 };
   }
   if (data.plan === "active") return { ok: true, used: data.documents_used, limit: Infinity };
