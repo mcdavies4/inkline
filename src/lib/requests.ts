@@ -1,9 +1,16 @@
 import { createHash, randomBytes, randomInt } from "crypto";
 import { supabaseAdmin, BUCKET } from "@/lib/supabase";
-import { sendDocument, sendCtaLink, sendText, sendTemplate } from "@/lib/whatsapp";
+import { sendDocument, sendText, sendCtaLink } from "@/lib/telegram";
 import { t } from "@/lib/i18n";
 import { extractPdfText } from "@/lib/doctext";
 import { summariseDocument } from "@/lib/summary";
+
+const BOT = process.env.TELEGRAM_BOT_USERNAME ?? "InklineSignbot";
+
+/** Deep link a signer taps to start signing in Telegram. */
+function signerDeepLink(signToken: string) {
+  return `https://t.me/${BOT}?start=sign_${signToken}`;
+}
 
 export function hashOtp(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -107,7 +114,13 @@ export async function createRequestPending(input: CreateRequestInput): Promise<s
   return request.id as string;
 }
 
-/** Delivers a request that already exists (fields placed or skipped). */
+/**
+ * Delivers a request that already exists (fields placed or skipped).
+ *
+ * TELEGRAM MODEL: the bot cannot message a stranger. So instead of pushing to
+ * the signer, we hand the SENDER a deep link to forward. If a signer has already
+ * started the bot (signer_chat_id is set), we message them directly as well.
+ */
 export async function deliverPlacedRequest(requestId: string) {
   const db = supabaseAdmin();
   const { data: request } = await db
@@ -128,16 +141,34 @@ export async function deliverPlacedRequest(requestId: string) {
   const ordered = [...signers];
   const toNotify = request.signing_flow === "sequential" ? [ordered[0]] : ordered;
 
-  let anyDelivered = false;
+  // Message any signer we can already reach (they've started the bot before).
   for (const signer of toNotify) {
-    const ok = await deliverToSigner(request, doc, signer, request.sender_name, request.message, request.mode);
-    anyDelivered = anyDelivered || ok;
+    await deliverToSigner(request, doc, signer).catch(() => {});
+  }
+
+  // Hand the sender the link(s) to forward. This is the moment the sender has
+  // been waiting for after placing fields — it must not fire before placement.
+  if (request.sender_chat_id) {
+    for (const signer of toNotify) {
+      if (signer.signer_chat_id) {
+        await sendText(
+          request.sender_chat_id,
+          `✅ <b>${doc.filename}</b> is ready and I've sent it straight to ${signer.name}.`
+        ).catch(() => {});
+      } else {
+        await sendText(
+          request.sender_chat_id,
+          `✅ Ready to send.\n\nForward this to <b>${signer.name}</b> — when they tap it I'll walk them through signing:\n\n${signerDeepLink(signer.sign_token)}\n\nYou'll both get the certified copy back here once it's signed.`
+        ).catch(() => {});
+      }
+    }
   }
 
   return {
     requestId,
-    delivered: anyDelivered,
+    delivered: true,
     signUrl: `${process.env.APP_BASE_URL}/sign/${ordered[0].sign_token}`,
+    shareLink: signerDeepLink(ordered[0].sign_token),
   };
 }
 
@@ -147,86 +178,53 @@ export async function createAndDeliverRequest(input: CreateRequestInput) {
   return deliverPlacedRequest(requestId);
 }
 
+/**
+ * Messages a signer directly — only possible once they've started the bot
+ * (signer_chat_id set by the /start sign_<token> deep link).
+ */
 async function deliverToSigner(
-  request: { id: string; mode: string },
+  request: { id: string; sender_name: string },
   doc: { filename: string; storage_path: string },
-  signer: { id: string; name: string; phone_e164: string; sign_token: string },
-  senderName: string,
-  message: string | null,
-  mode: string
+  signer: { id: string; name: string; sign_token: string; signer_chat_id?: string | null }
 ): Promise<boolean> {
+  if (!signer.signer_chat_id) return false; // unreachable until they tap the link
+
   const db = supabaseAdmin();
-  const { data: signedUrl } = await db.storage
-    .from(BUCKET)
-    .createSignedUrl(doc.storage_path, 60 * 60 * 24 * 7);
   const signUrl = `${process.env.APP_BASE_URL}/sign/${signer.sign_token}`;
-  const template = process.env.WHATSAPP_TEMPLATE_SIGNATURE_REQUEST;
 
-  // WHY TEMPLATE FIRST: WhatsApp only DELIVERS freeform messages (text, document,
-  // CTA) to a number with an open 24-hour window. For a signer who hasn't messaged
-  // the bot, the API ACCEPTS the freeform send (returns 200, no error) but SILENTLY
-  // DROPS it. That's why signers "got nothing" while the send logged as success.
-  // The approved template is the ONLY message type that delivers regardless of
-  // window — so it must be the primary, guaranteed path.
-  let delivered = false;
-
-  // Small pause helper so WhatsApp delivers messages in the order we send them.
-  // Without this, template (one route) and freeform (another) can arrive out of
-  // order — the link showing before the "someone sent you a document" opener.
-  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  // 1. TEMPLATE — the opener. Guaranteed delivery even to cold signers.
-  if (template) {
-    try {
-      await sendTemplate(signer.phone_e164, template, [senderName, doc.filename]);
-      delivered = true;
-      await db.from("audit_events").insert({
-        request_id: request.id,
-        signer_id: signer.id,
-        event_type: "wa_sent",
-        meta: { channel: "template" },
-      });
-      await pause(1200);
-    } catch (e) {
-      console.error("deliverToSigner: template send failed —", e instanceof Error ? e.message : e);
-    }
-  }
-
-  // 2. LINK MESSAGE — the actual tappable signing link (freeform; delivers if
-  //    the window is open). Sent after the opener so it arrives second.
   try {
-    await sendText(
-      signer.phone_e164,
-      `${t("sign_cta_body", { name: signer.name.split(" ")[0] })}\n${signUrl}`
+    await sendCtaLink(
+      signer.signer_chat_id,
+      `${request.sender_name} has asked you to sign <b>${doc.filename}</b>. It takes about 20 seconds.`,
+      "Review & sign",
+      signUrl
     );
-    if (!delivered) {
-      delivered = true;
-      await db.from("audit_events").insert({
-        request_id: request.id,
-        signer_id: signer.id,
-        event_type: "wa_sent",
-        meta: { channel: "freeform" },
-      });
-    }
-    await pause(1200);
-
-    // 3. DOCUMENT — the PDF to preview, last.
-    if (signedUrl?.signedUrl) {
-      await sendDocument(signer.phone_e164, signedUrl.signedUrl, doc.filename).catch(() => {});
-    }
+    await db.from("audit_events").insert({
+      request_id: request.id,
+      signer_id: signer.id,
+      event_type: "tg_sent",
+      meta: { channel: "telegram" },
+    });
+    return true;
   } catch (e) {
-    console.error("deliverToSigner: freeform enhancement failed (window likely closed) —", e instanceof Error ? e.message : e);
+    console.error("deliverToSigner:", e instanceof Error ? e.message : e);
+    return false;
   }
-
-  return delivered;
 }
 
-
-export async function issueOtp(signerId: string, phone: string): Promise<void> {
+/** Sends the OTP code to a signer in Telegram. */
+export async function issueOtp(signerId: string, _phone: string): Promise<void> {
   const db = supabaseAdmin();
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await db.from("signers").update({ otp_code: hashOtp(code) }).eq("id", signerId);
-  await sendText(phone, t("sign_otp_message", { code }));
+  const { data: signer } = await db
+    .from("signers")
+    .select("signer_chat_id")
+    .eq("id", signerId)
+    .maybeSingle();
+  if (signer?.signer_chat_id) {
+    await sendText(signer.signer_chat_id, t("sign_otp_message", { code })).catch(() => {});
+  }
 }
 
 export async function advanceAfterSignature(requestId: string): Promise<{ allDone: boolean }> {
@@ -260,14 +258,22 @@ export async function advanceAfterSignature(requestId: string): Promise<{ allDon
   if (request.signing_flow === "sequential") {
     const next = remaining[0];
     if (next.status === "pending") {
-      await deliverToSigner(request, request.documents, next, request.sender_name, request.message, request.mode);
+      await deliverToSigner(request, request.documents, next).catch(() => {});
+      // If we can't reach them yet, give the sender their link to forward.
+      if (!next.signer_chat_id && request.sender_chat_id) {
+        await sendText(
+          request.sender_chat_id,
+          `Next up: <b>${next.name}</b>. Forward this to them:\n\n${signerDeepLink(next.sign_token)}`
+        ).catch(() => {});
+      }
     }
   }
 
-  if (request.sender_phone) {
+  // Progress ping to the sender.
+  if (request.sender_chat_id) {
     const justSigned = signers.find((s) => s.status === "signed");
     await sendText(
-      request.sender_phone,
+      request.sender_chat_id,
       t("sign_sender_progress", {
         name: justSigned?.name ?? "A signer",
         filename: request.documents.filename,
@@ -281,12 +287,10 @@ export async function advanceAfterSignature(requestId: string): Promise<{ allDon
 
 /**
  * Builds the final certified PDF (placed fields OR legacy bottom signatures),
- * stores it, and delivers to all signers + sender. Returns a download URL.
+ * stores it, and delivers it to every signer we can reach plus the sender.
  */
-export async function buildAndDeliverFinal(requestId: string, senderTokenForTemplate: string): Promise<string | null> {
+export async function buildAndDeliverFinal(requestId: string, _unused?: string): Promise<string | null> {
   const { stampAndCertify } = await import("@/lib/pdf");
-  const { sendDocument, sendText, sendTemplate } = await import("@/lib/whatsapp");
-  const { t } = await import("@/lib/i18n");
   const db = supabaseAdmin();
 
   const { data: request } = await db
@@ -342,7 +346,6 @@ export async function buildAndDeliverFinal(requestId: string, senderTokenForTemp
       }
       placedFields.push({ type: f.type, page: f.page, x: f.x, y: f.y, w: f.w, h: f.h, value: f.value, png });
     }
-    // If we have placed fields but a signer used the fallback signature, still ensure at least one has content
     if (placedFields.length === 0) placedFields = undefined;
   }
 
@@ -356,23 +359,29 @@ export async function buildAndDeliverFinal(requestId: string, senderTokenForTemp
   });
 
   const signedPath = `signed/${requestId}.pdf`;
-  await db.storage.from(BUCKET).upload(signedPath, Buffer.from(finalPdf), { contentType: "application/pdf", upsert: true });
+  await db.storage.from(BUCKET).upload(signedPath, Buffer.from(finalPdf), {
+    contentType: "application/pdf",
+    upsert: true,
+  });
   await db.from("sign_requests").update({ signed_pdf_path: signedPath }).eq("id", requestId);
 
   const { data: dl } = await db.storage.from(BUCKET).createSignedUrl(signedPath, 60 * 60 * 24 * 7);
+
+  // TELEGRAM DELIVERY: recipients are chat ids, not phone numbers.
   const recipients = new Map<string, string>();
-  for (const s of allSigners ?? []) recipients.set(s.phone_e164, s.name);
-  if (request.sender_phone) recipients.set(request.sender_phone, request.sender_name);
+  for (const s of allSigners ?? []) {
+    if (s.signer_chat_id) recipients.set(s.signer_chat_id, s.name);
+  }
+  if (request.sender_chat_id) recipients.set(request.sender_chat_id, request.sender_name);
 
   if (dl?.signedUrl) {
     const signedName = document.filename.replace(/\.pdf$/i, "") + " (signed).pdf";
-    for (const [phone, name] of Array.from(recipients.entries())) {
+    for (const [chatId, name] of Array.from(recipients.entries())) {
       try {
-        await sendDocument(phone, dl.signedUrl, signedName, t("sign_done_signer"));
-        await sendText(phone, t("sign_thanks", { first: name.split(" ")[0] }));
-      } catch {
-        const template = process.env.WHATSAPP_TEMPLATE_SIGNED_COPY;
-        if (template) await sendTemplate(phone, template, [document.filename], senderTokenForTemplate).catch(() => {});
+        await sendDocument(chatId, dl.signedUrl, signedName, t("sign_done_signer"));
+        await sendText(chatId, t("sign_thanks", { first: name.split(" ")[0] }));
+      } catch (e) {
+        console.error("final delivery failed for", chatId, e instanceof Error ? e.message : e);
       }
     }
     await db.from("audit_events").insert({
