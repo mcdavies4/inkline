@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import SignatureField from "./SignatureField";
 
 type Field = {
   id: string;
@@ -149,6 +150,7 @@ export default function PlacementSign(props: Props) {
         {error && <p className="err">{error}</p>}
         {pages.map((pg, idx) => (
           <div key={idx} className="place-page" style={{ aspectRatio: `1 / ${pg.ratio}`, cursor: "default" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={pg.dataUrl} alt={`Page ${idx + 1}`} draggable={false} />
             {props.fields
               .filter((f) => f.page === idx)
@@ -170,6 +172,7 @@ export default function PlacementSign(props: Props) {
                     onClick={() => setActiveField(f)}
                   >
                     {v?.png ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={v.png} alt="" style={{ maxWidth: "100%", maxHeight: "100%" }} />
                     ) : v?.value ? (
                       <span className="fill-val">{v.value}</span>
@@ -198,7 +201,6 @@ export default function PlacementSign(props: Props) {
       {activeField && (
         <FieldModal
           field={activeField}
-          signerName={props.signerName}
           onClose={() => setActiveField(null)}
           onSave={(payload) => {
             setValues((prev) => ({ ...prev, [activeField.id]: payload }));
@@ -213,70 +215,17 @@ export default function PlacementSign(props: Props) {
 /** Modal to fill a single field by type. */
 function FieldModal({
   field,
-  signerName,
   onClose,
   onSave,
 }: {
   field: Field;
-  signerName: string;
   onClose: () => void;
   onSave: (payload: { value?: string; png?: string }) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const [hasInk, setHasInk] = useState(false);
+  const [signaturePng, setSignaturePng] = useState<string | null>(null);
   const [text, setText] = useState("");
 
   const isDraw = field.type === "signature" || field.type === "initials";
-
-  useEffect(() => {
-    if (!isDraw) return;
-    const c = canvasRef.current;
-    if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = c.getBoundingClientRect();
-    c.width = rect.width * dpr;
-    c.height = rect.height * dpr;
-    const ctx = c.getContext("2d")!;
-    ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#1a2238";
-    const pos = (e: PointerEvent) => {
-      const r = c.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-    const down = (e: PointerEvent) => {
-      e.preventDefault();
-      drawing.current = true;
-      const p = pos(e);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-    };
-    const move = (e: PointerEvent) => {
-      if (!drawing.current) return;
-      e.preventDefault();
-      const p = pos(e);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-      setHasInk(true);
-    };
-    const up = () => (drawing.current = false);
-    c.addEventListener("pointerdown", down);
-    c.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      c.removeEventListener("pointerdown", down);
-      c.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [isDraw]);
-
-  const clear = () => {
-    const c = canvasRef.current;
-    if (c) c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
-    setHasInk(false);
-  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -287,14 +236,13 @@ function FieldModal({
 
         {isDraw ? (
           <>
-            <div className="sigbox" style={{ height: 140 }}>
-              <canvas ref={canvasRef} className="sigcanvas" />
-            </div>
-            <button className="ghost" onClick={clear} disabled={!hasInk}>Start again</button>
+            {/* Smooth pad — replaces the old hand-rolled canvas that felt shaky.
+                Returns the same PNG data URL, so onSave is unchanged. */}
+            <SignatureField onChange={setSignaturePng} height={160} penColor="#1a2238" />
             <button
               className="primary"
-              disabled={!hasInk}
-              onClick={() => onSave({ png: canvasRef.current!.toDataURL("image/png") })}
+              disabled={!signaturePng}
+              onClick={() => onSave({ png: signaturePng! })}
             >
               Add
             </button>
