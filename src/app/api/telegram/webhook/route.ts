@@ -350,6 +350,10 @@ async function startSigner(chatId: string, fromName: string, signToken: string) 
 // Billing gate (reuses your accounts table, keyed by chat_id)
 // ============================================================
 async function canSend(chatId: string): Promise<{ ok: boolean; used: number; limit: number }> {
+  // Founder/owner always has unlimited access — no paywall, no DB dependency.
+  if (process.env.ADMIN_TG_CHAT_ID && chatId === process.env.ADMIN_TG_CHAT_ID) {
+    return { ok: true, used: 0, limit: Infinity };
+  }
   const supa = db();
   const { data } = await supa.from("accounts").select("*").eq("phone_e164", `tg:${chatId}`).maybeSingle();
   if (!data) {
