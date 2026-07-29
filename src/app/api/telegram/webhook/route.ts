@@ -83,6 +83,12 @@ async function handleMessage(msg: Record<string, any>) {
   if (session?.state === "awaiting_plan") {
     return handlePlanChoice(chatId, upper);
   }
+  if (session?.state === "awaiting_more") {
+    return onMoreSigners(chatId, text, upper, session);
+  }
+  if (session?.state === "awaiting_flow") {
+    return onFlowChoice(chatId, upper, session);
+  }
   if (session?.state === "awaiting_placement") {
     return onPlacementChoice(chatId, fromName, upper, session);
   }
@@ -159,14 +165,55 @@ async function handleDocument(chatId: string, fromName: string, document: Record
 }
 
 async function onSignerName(chatId: string, fromName: string, name: string, session: any) {
-  if (!name || name.length < 2) {
+  if (!name || name.length < 2 || name.length > 80) {
     return sendText(chatId, "Please send the signer's name.");
   }
-  await setSession(chatId, "awaiting_placement", { ...session.data, signer_name: name });
+  const signers = [...(session.data.signers ?? []), { name }];
+  await setSession(chatId, "awaiting_more", { ...session.data, signers });
   await sendText(
     chatId,
-    `Signing for <b>${name}</b>.\n\nWhere should the signature go?\n\n` +
-      `📍 <b>PLACE</b> — position the signature exactly on the page\n` +
+    `Added <b>${name}</b>.\n\nAnyone else signing? Send the next name, or reply <b>DONE</b>.`
+  );
+}
+
+/** DONE finishes the signer list; anything else is treated as another name. */
+async function onMoreSigners(chatId: string, text: string, upper: string, session: any) {
+  if (upper !== "DONE") {
+    return onSignerName(chatId, "", text, session);
+  }
+  const signers = session.data.signers ?? [];
+  if (signers.length === 0) {
+    return sendText(chatId, "Send me at least one signer's name first.");
+  }
+  if (signers.length === 1) {
+    await setSession(chatId, "awaiting_placement", { ...session.data, flow: "single" });
+    return askPlacement(chatId, signers);
+  }
+  await setSession(chatId, "awaiting_flow", session.data);
+  await sendText(
+    chatId,
+    `${signers.length} signers. How should they sign?\n\n` +
+      `🔢 <b>ORDER</b> — one after another, in the order you added them\n` +
+      `👥 <b>TOGETHER</b> — everyone gets it at the same time\n\n` +
+      `Reply ORDER or TOGETHER.`
+  );
+}
+
+async function onFlowChoice(chatId: string, upper: string, session: any) {
+  if (upper !== "ORDER" && upper !== "TOGETHER") {
+    return sendText(chatId, "Reply ORDER or TOGETHER.");
+  }
+  const flow = upper === "ORDER" ? "sequential" : "parallel";
+  await setSession(chatId, "awaiting_placement", { ...session.data, flow });
+  return askPlacement(chatId, session.data.signers ?? []);
+}
+
+function askPlacement(chatId: string, signers: { name: string }[]) {
+  const who = signers.map((s) => s.name).join(", ");
+  return sendText(
+    chatId,
+    `Signing for <b>${who}</b>.\n\nWhere should the signature go?\n\n` +
+      `📍 <b>PLACE</b> — position the fields exactly on the page\n` +
       `⬇️ <b>SKIP</b> — put it at the bottom of the last page\n\n` +
       `Reply PLACE or SKIP.`
   );
@@ -185,7 +232,7 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
       sender_name: fromName,
       sender_chat_id: chatId,
       mode: "signature",       // allowed: 'signature' | 'quick_approval'
-      signing_flow: "single",  // allowed: 'single' | 'sequential' | 'parallel'
+      signing_flow: data.flow ?? "single",  // allowed: 'single' | 'sequential' | 'parallel'
       ai_summary: data.ai_summary ?? null,
       status: "pending",       // allowed: 'pending' | 'in_progress' | ...
       placement: upper === "PLACE" ? "pending" : "none",  // allowed: 'none' | 'pending' | 'done'
@@ -197,14 +244,20 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
     return sendText(chatId, `Couldn't create the request — ${reqErr.message ?? "error"}. Reply RESTART.`);
   }
 
-  await supa.from("signers").insert({
+  const signerList: { name: string }[] = data.signers ?? [];
+  const rows = signerList.map((sgr, i) => ({
     request_id: request.id,
-    name: data.signer_name,
-    phone_e164: `tg:${chatId}`,  // NOT NULL in your schema; no phone on Telegram, so store a tg: marker
-    sign_token: signToken,
-    sign_order: 1,
+    name: sgr.name,
+    phone_e164: `tg:${chatId}:${i + 1}`,  // NOT NULL in your schema; no phone on Telegram
+    sign_token: i === 0 ? signToken : randomToken(),
+    sign_order: i + 1,
     status: "pending",
-  });
+  }));
+  const { error: sErr } = await supa.from("signers").insert(rows);
+  if (sErr) {
+    console.error("signers insert:", JSON.stringify(sErr));
+    return sendText(chatId, `Couldn't add the signers — ${sErr.message ?? "error"}. Reply RESTART.`);
+  }
 
   // Count the document against the sender's allowance.
   await recordDocumentSent(chatId);
@@ -216,7 +269,7 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
     await clearSession(chatId);
     await sendCtaLink(
       chatId,
-      `Position the fields for <b>${data.signer_name}</b>, then tap Done in the editor.`,
+      `Position the fields, then tap Done in the editor.`,
       "Open placement editor",
       `${BASE}/place/${placeToken}`
     );
@@ -225,18 +278,37 @@ async function onPlacementChoice(chatId: string, fromName: string, upper: string
     return;
   }
 
-  // SKIP — hand the sender the shareable signing link right away.
+  // SKIP — hand the sender the shareable link(s) right away.
   await clearSession(chatId);
-  await shareSignerLink(chatId, data.signer_name, signToken);
+  const toShare = data.flow === "sequential" ? rows.slice(0, 1) : rows;
+  await shareSignerLinks(chatId, toShare, data.flow === "sequential" && rows.length > 1);
 }
 
-/** Gives the SENDER the deep link to forward to their signer. */
-async function shareSignerLink(chatId: string, signerName: string, signToken: string) {
-  const deep = `https://t.me/${BOT}?start=sign_${signToken}`;
+/** Gives the SENDER the deep link(s) to forward to each signer. */
+async function shareSignerLinks(
+  chatId: string,
+  signers: { name: string; sign_token: string }[],
+  sequential: boolean
+) {
+  const link = (tok: string) => `https://t.me/${BOT}?start=sign_${tok}`;
+
+  if (signers.length === 1) {
+    await sendText(
+      chatId,
+      `✅ Ready to send.\n\nForward this to <b>${signers[0].name}</b> — when they tap it I'll walk them through signing:\n\n${link(signers[0].sign_token)}\n\n` +
+        (sequential
+          ? `They're first in the order. I'll send you the next person's link as soon as they've signed.`
+          : `You'll both get the certified copy back here once it's signed.`)
+    );
+    return;
+  }
+
+  const lines = signers
+    .map((sg, i) => `${i + 1}. <b>${sg.name}</b>\n${link(sg.sign_token)}`)
+    .join("\n\n");
   await sendText(
     chatId,
-    `✅ Ready to send.\n\nForward this to <b>${signerName}</b> — when they tap it, I'll walk them through signing:\n\n${deep}\n\n` +
-      `You'll both get the certified copy back here once it's signed.`
+    `✅ Ready to send.\n\nForward each person their own link:\n\n${lines}\n\nEveryone gets the certified copy back here once all have signed.`
   );
 }
 
