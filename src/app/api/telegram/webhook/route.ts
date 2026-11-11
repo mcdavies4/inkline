@@ -88,6 +88,8 @@ async function handleMessage(msg: Record<string, any>) {
   }
   if (upper === "ADMIN") return handleAdmin(chatId);
   if (upper === "BILLING" || upper === "SUBSCRIBE") return handleBilling(chatId);
+  if (upper === "PAY" || upper === "UPGRADE") return startSubscribe(chatId, false);
+  if (upper === "CANCELSUB" || upper === "CANCEL SUBSCRIPTION") return handleCancelSub(chatId);
   if (upper === "STATUS") return handleStatus(chatId);
   if (upper === "TEMPLATES" || upper === "TEMPLATE" || upper === "NEW" || upper === "CREATE") {
     return sendTemplatesMenu(chatId);
@@ -111,9 +113,6 @@ async function handleMessage(msg: Record<string, any>) {
   }
   if (session?.state === "awaiting_signer_name") {
     return onSignerName(chatId, fromName, text, session);
-  }
-  if (session?.state === "awaiting_plan") {
-    return handlePlanChoice(chatId, upper);
   }
   if (session?.state === "awaiting_more") {
     return onMoreSigners(chatId, text, upper, session);
@@ -523,54 +522,68 @@ async function recordDocumentSent(chatId: string) {
     .eq("phone_e164", `tg:${chatId}`);
 }
 
-async function sendPaywall(chatId: string) {
-  await setSession(chatId, "awaiting_plan", {});
-  await sendText(
-    chatId,
-    `You've used your 3 free documents 🎉\n\nGo unlimited with Inkline:\n\n` +
-      `💳 <b>MONTHLY</b> — $9/month\n💳 <b>ANNUAL</b> — $90/year (2 months free)\n\n` +
-      `Reply MONTHLY or ANNUAL to subscribe.`
-  );
-}
-
-/** MONTHLY / ANNUAL reply -> real Stripe Checkout link. */
-async function handlePlanChoice(chatId: string, upper: string) {
-  if (upper !== "MONTHLY" && upper !== "ANNUAL") {
-    return sendText(chatId, "Reply MONTHLY or ANNUAL to choose a plan, or CANCEL.");
-  }
-  const plan = upper === "ANNUAL" ? "annual" : "monthly";
-  const { createStripeCheckout } = await import("@/lib/billing");
-  // Accounts are keyed by phone_e164; for Telegram that key is `tg:<chatId>`.
-  const url = await createStripeCheckout(`tg:${chatId}`, plan);
-  await clearSession(chatId);
+/** Sends the Paystack subscribe link. `paywall` frames it as "out of free docs". */
+async function startSubscribe(chatId: string, paywall: boolean) {
+  const { initPaystackSubscription, PAYSTACK_PRICE_LABEL } = await import("@/lib/paystack");
+  const url = await initPaystackSubscription(chatId);
   if (!url) {
     return sendText(chatId, "Couldn't open checkout just now — please try again shortly.");
   }
+  const intro = paywall ? "You've used your 3 free documents 🎉" : "<b>Inkline Unlimited</b>";
   await sendCtaLink(
     chatId,
-    `Complete your ${plan} subscription, then come back and send your document.`,
-    "Subscribe securely",
+    `${intro}\n\nGo unlimited for <b>${PAYSTACK_PRICE_LABEL}</b> — unlimited documents and signers, cancel anytime.`,
+    "Subscribe — ₦5,000/month",
     url
   );
 }
 
-/** BILLING command — portal for subscribers, plans for everyone else. */
+async function sendPaywall(chatId: string) {
+  return startSubscribe(chatId, true);
+}
+
+/** BILLING command — subscription status, or the subscribe link. */
 async function handleBilling(chatId: string) {
-  const { getAccount, createStripePortal } = await import("@/lib/billing");
+  const { getAccount } = await import("@/lib/billing");
   const account = await getAccount(`tg:${chatId}`);
-  if ((account.plan === "active" || account.plan === "past_due") && account.stripe_customer_id) {
-    const portal = await createStripePortal(`tg:${chatId}`);
-    if (portal) {
-      return sendCtaLink(
-        chatId,
-        "Manage your subscription — update your card, view invoices, or cancel.",
-        "Open billing portal",
-        portal
-      );
-    }
-    return sendText(chatId, "Couldn't open your billing page just now — please try again shortly.");
+  if (account.plan === "active" || account.plan === "past_due") {
+    return sendText(
+      chatId,
+      `You're on <b>Inkline Unlimited</b> (₦5,000/month).\n\n` +
+        (account.plan === "past_due" ? "⚠️ Your last payment failed — reply PAY to renew.\n\n" : "") +
+        `To cancel, reply <b>CANCELSUB</b>.`
+    );
   }
-  return sendPaywall(chatId);
+  return startSubscribe(chatId, false);
+}
+
+/** CANCELSUB — disables the Paystack subscription. */
+async function handleCancelSub(chatId: string) {
+  const supa = db();
+  const { data: acc } = await supa
+    .from("accounts")
+    .select("paystack_subscription_code, paystack_email_token, plan")
+    .eq("phone_e164", `tg:${chatId}`)
+    .maybeSingle();
+  if (!acc || (acc.plan !== "active" && acc.plan !== "past_due")) {
+    return sendText(chatId, "You don't have an active subscription.");
+  }
+  if (!acc.paystack_subscription_code || !acc.paystack_email_token) {
+    return sendText(
+      chatId,
+      "I couldn't find your subscription details to cancel automatically. Please email inklinesign@outlook.com and we'll sort it."
+    );
+  }
+  const { disablePaystackSubscription } = await import("@/lib/paystack");
+  const ok = await disablePaystackSubscription(acc.paystack_subscription_code, acc.paystack_email_token);
+  if (ok) {
+    await supa.from("accounts").update({ plan: "cancelled" }).eq("phone_e164", `tg:${chatId}`);
+    return sendText(
+      chatId,
+      "Your subscription is cancelled — you won't be charged again. Resubscribe anytime with PAY."
+    );
+  }
+  return sendText(chatId, "Couldn't cancel just now — please try again shortly, or email inklinesign@outlook.com.");
 }
 
 // ============================================================

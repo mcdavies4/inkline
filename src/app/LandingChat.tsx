@@ -135,8 +135,8 @@ export default function LandingChat() {
           </div>
           <div className="card pro">
             <div className="c-k">Unlimited</div>
-            <div className="c-v">$9<span>/month</span></div>
-            <p>Or $90 a year. Unlimited documents and signers. Cancel anytime.</p>
+            <div className="c-v">₦5,000<span>/month</span></div>
+            <p>Unlimited documents and signers. Pay with card, bank transfer or USSD. Cancel anytime.</p>
           </div>
         </div>
         <a className="cta big" href={BOT_URL} target="_blank" rel="noopener noreferrer">
