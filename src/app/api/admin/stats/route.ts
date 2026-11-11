@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
     requests,
     signers,
     documents,
+    reachCount,
+    sources,
   ] = await Promise.all([
     db.from("accounts").select("phone_e164, plan, documents_used, created_at").limit(1000),
     db
@@ -34,6 +36,8 @@ export async function POST(req: NextRequest) {
       .limit(500),
     db.from("signers").select("id, request_id, status, created_at").limit(2000),
     db.from("documents").select("size_bytes, created_at").limit(1000),
+    db.from("bot_users").select("*", { count: "exact", head: true }),
+    db.from("bot_sources").select("source").limit(5000),
   ]);
 
   const acc = (accounts.data ?? []) as { phone_e164: string; plan: string; documents_used: number; created_at: string }[];
@@ -88,9 +92,22 @@ export async function POST(req: NextRequest) {
   const totalDocs = reqs.length;
   const signedDocs = reqs.filter((r) => r.status === "signed").length;
 
+  // Channel-source breakdown (from bot_sources)
+  const srcRows = (sources.data ?? []) as { source: string }[];
+  const bySource = new Map<string, number>();
+  for (const s of srcRows) bySource.set(s.source, (bySource.get(s.source) ?? 0) + 1);
+  const sourceList = Array.from(bySource.entries())
+    .map(([source, users]) => ({ source, users }))
+    .sort((a, b) => b.users - a.users)
+    .slice(0, 20);
+
+  const reach = reachCount.count ?? 0;
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     totals: {
+      reach,
+      activationRate: reach ? Math.round((acc.length / reach) * 100) : 0,
       senders: acc.length,
       subscribers: acc.filter((a) => a.plan === "active").length,
       pastDue: acc.filter((a) => a.plan === "past_due").length,
@@ -111,6 +128,7 @@ export async function POST(req: NextRequest) {
       senders7d: since(acc, 7 * DAY),
     },
     daily,
+    sources: sourceList,
     senders: Array.from(bySender.entries())
       .map(([key, v]) => ({ key, ...v }))
       .sort((a, b) => b.docs - a.docs)

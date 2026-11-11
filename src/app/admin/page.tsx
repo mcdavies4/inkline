@@ -5,12 +5,14 @@ import { useState } from "react";
 type Stats = {
   generatedAt: string;
   totals: {
+    reach: number; activationRate: number;
     senders: number; subscribers: number; pastDue: number; cancelled: number;
     documents: number; signed: number; pending: number; completionRate: number;
     signers: number; signersSigned: number; storageMb: number; withPlacement: number;
   };
   recent: { docs24h: number; docs7d: number; docs30d: number; senders7d: number };
   daily: { day: string; docs: number }[];
+  sources: { source: string; users: number }[];
   senders: { key: string; name: string; docs: number; signed: number; last: string }[];
   latest: { id: string; sender: string; filename: string; status: string; created_at: string }[];
 };
@@ -81,6 +83,7 @@ export default function AdminPage() {
       </header>
 
       <section className="kpis">
+        <Kpi label="Reach" value={t.reach} sub={`${t.activationRate}% sent a document`} />
         <Kpi label="Senders" value={t.senders} sub={`+${stats.recent.senders7d} this week`} />
         <Kpi label="Subscribers" value={t.subscribers} sub={`${t.pastDue} past due · ${t.cancelled} cancelled`} accent />
         <Kpi label="Documents" value={t.documents} sub={`${stats.recent.docs24h} today · ${stats.recent.docs7d} this week`} />
@@ -111,6 +114,21 @@ export default function AdminPage() {
           </ul>
         </div>
       </section>
+
+      {stats.sources.length > 0 && (
+        <section className="panel">
+          <h2>Where users came from</h2>
+          <div className="tbl">
+            <div className="tr th two"><span>Source</span><span>Users</span></div>
+            {stats.sources.map((s) => (
+              <div className="tr two" key={s.source}>
+                <span className="strong">{s.source}</span>
+                <span>{s.users}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="panel">
         <h2>Senders</h2>
@@ -181,7 +199,7 @@ const CSS = `
 .top-r{display:flex;align-items:center;gap:12px;}
 .stamp{color:rgba(246,255,250,.45);font-size:12.5px;}
 
-.kpis{max-width:1080px;margin:0 auto 20px;padding:0 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.kpis{max-width:1080px;margin:0 auto 20px;padding:0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;}
 .kpi{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:16px;padding:18px;}
 .kpi-a{border-color:rgba(18,226,122,.4);background:rgba(18,226,122,.07);}
 .kpi-l{font-size:12px;text-transform:uppercase;letter-spacing:.9px;color:rgba(246,255,250,.55);font-weight:600;}
@@ -210,6 +228,7 @@ const CSS = `
 .tr{display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr;gap:12px;padding:11px 0;
   border-bottom:1px solid var(--line);font-size:13.5px;align-items:center;}
 .tr.four{grid-template-columns:.8fr 2fr 1.4fr 1fr;}
+.tr.two{grid-template-columns:3fr 1fr;}
 .th{color:rgba(246,255,250,.45);font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;font-weight:600;}
 .tr:last-child{border-bottom:0;}
 .strong{font-weight:600;}
@@ -225,6 +244,7 @@ const CSS = `
   .kpis{grid-template-columns:1fr 1fr;}
   .grid2{grid-template-columns:1fr;}
   .tr,.tr.four{grid-template-columns:1.6fr .8fr .8fr;font-size:12.5px;}
+  .tr.two{grid-template-columns:2fr 1fr;}
   .tr span:nth-child(4){display:none;}
   .th span:nth-child(4){display:none;}
 }

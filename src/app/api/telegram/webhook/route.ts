@@ -54,6 +54,10 @@ async function handleMessage(msg: Record<string, any>) {
   const text: string = (msg.text ?? "").trim();
   const upper = text.toUpperCase();
 
+  // Reach tracking: record every person who interacts, so we can see the true
+  // top of funnel (opened the bot) vs activation (actually sent a document).
+  await touchUser(chatId, fromName).catch(() => {});
+
   // ---- Deep-link entry: /start sign_<token> (a signer tapping their link) ----
   if (text.startsWith("/start")) {
     const param = text.split(" ")[1] ?? "";
@@ -67,6 +71,8 @@ async function handleMessage(msg: Record<string, any>) {
         await db()
           .from("bot_sources")
           .upsert({ chat_id: chatId, source }, { onConflict: "chat_id,source", ignoreDuplicates: true });
+        // Stamp the source onto the user's reach row too (first touch wins).
+        await db().from("bot_users").update({ source }).eq("chat_id", chatId).is("source", null);
       } catch (e) {
         console.error("source log failed:", e instanceof Error ? e.message : e);
       }
@@ -575,18 +581,23 @@ async function handleAdmin(chatId: string) {
   if (!admin || chatId !== admin) return sendText(chatId, welcome("there"));
 
   const supa = db();
-  const [senders, subs, docsAll, docsSigned] = await Promise.all([
+  const [reach, senders, subs, docsAll, docsSigned] = await Promise.all([
+    supa.from("bot_users").select("*", { count: "exact", head: true }),
     supa.from("accounts").select("*", { count: "exact", head: true }),
     supa.from("accounts").select("*", { count: "exact", head: true }).eq("plan", "active"),
     supa.from("sign_requests").select("*", { count: "exact", head: true }),
     supa.from("sign_requests").select("*", { count: "exact", head: true }).eq("status", "signed"),
   ]);
+  const reachN = reach.count ?? 0;
+  const sendersN = senders.count ?? 0;
   const total = docsAll.count ?? 0;
   const signed = docsSigned.count ?? 0;
   const rate = total ? Math.round((signed / total) * 100) : 0;
+  const activation = reachN ? Math.round((sendersN / reachN) * 100) : 0;
   await sendText(
     chatId,
-    `📊 <b>Inkline stats</b>\n\n👤 Senders: ${senders.count ?? 0} · 💳 Subscribers: ${subs.count ?? 0}\n\n` +
+    `📊 <b>Inkline stats</b>\n\n` +
+      `👀 Reach: ${reachN} opened the bot\n👤 Senders: ${sendersN} sent (${activation}% activated) · 💳 Subscribers: ${subs.count ?? 0}\n\n` +
       `📄 Documents: ${total} total\n   ✓ ${signed} completed (${rate}%)`
   );
 }
@@ -619,6 +630,15 @@ async function setSession(chatId: string, state: string, data: any) {
 async function clearSession(chatId: string) {
   const supa = db();
   await supa.from("tg_sessions").delete().eq("chat_id", chatId);
+}
+
+/** Records/refreshes a reach row for anyone who interacts with the bot. */
+async function touchUser(chatId: string, name: string) {
+  const supa = db();
+  // Upsert on conflict updates name + last_seen; first_seen keeps its insert default.
+  await supa
+    .from("bot_users")
+    .upsert({ chat_id: chatId, name, last_seen: new Date().toISOString() }, { onConflict: "chat_id" });
 }
 
 // ============================================================
