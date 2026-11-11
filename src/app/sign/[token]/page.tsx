@@ -120,6 +120,13 @@ export default function SignPage() {
           <p className="mute">Your signed copy of <strong>{data.filename}</strong> is on its way to your Telegram, certificate included.</p>
           {downloadUrl && <a className="doclink" href={downloadUrl} target="_blank" rel="noreferrer">Download your signed copy ↗</a>}
         </div>
+        <div className="card center">
+          <p className="mute" style={{ marginBottom: 12 }}>Need something signed yourself?</p>
+          <a className="primary" style={{ display: "inline-block", textDecoration: "none" }} href="https://t.me/InklineSignbot?start=src_signer" target="_blank" rel="noreferrer">
+            Try Inkline free →
+          </a>
+          <p className="summary-fine" style={{ marginTop: 10 }}>3 free documents. No app, no account.</p>
+        </div>
       </main>
     );
 

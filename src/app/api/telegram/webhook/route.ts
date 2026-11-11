@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendText, sendDocument, sendCtaLink, fetchMedia } from "@/lib/telegram";
+import { TEMPLATES, findTemplate, type DocTemplate } from "@/lib/templates";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -59,6 +60,17 @@ async function handleMessage(msg: Record<string, any>) {
     if (param.startsWith("sign_")) {
       return startSigner(chatId, fromName, param.slice(5));
     }
+    // Source tracking: t.me/InklineSignbot?start=src_<channel>
+    if (param.startsWith("src_")) {
+      const source = param.slice(4).slice(0, 40);
+      try {
+        await db()
+          .from("bot_sources")
+          .upsert({ chat_id: chatId, source }, { onConflict: "chat_id,source", ignoreDuplicates: true });
+      } catch (e) {
+        console.error("source log failed:", e instanceof Error ? e.message : e);
+      }
+    }
     return sendText(chatId, welcome(fromName));
   }
 
@@ -71,6 +83,9 @@ async function handleMessage(msg: Record<string, any>) {
   if (upper === "ADMIN") return handleAdmin(chatId);
   if (upper === "BILLING" || upper === "SUBSCRIBE") return handleBilling(chatId);
   if (upper === "STATUS") return handleStatus(chatId);
+  if (upper === "TEMPLATES" || upper === "TEMPLATE" || upper === "NEW" || upper === "CREATE") {
+    return sendTemplatesMenu(chatId);
+  }
 
   // ---- Inbound document (the sender's PDF) ----
   if (msg.document) {
@@ -85,6 +100,9 @@ async function handleMessage(msg: Record<string, any>) {
 
   // ---- Session-driven text steps ----
   const session = await getSession(chatId);
+  if (session?.state === "template_field") {
+    return onTemplateField(chatId, text, session);
+  }
   if (session?.state === "awaiting_signer_name") {
     return onSignerName(chatId, fromName, text, session);
   }
@@ -99,6 +117,12 @@ async function handleMessage(msg: Record<string, any>) {
   }
   if (session?.state === "awaiting_placement") {
     return onPlacementChoice(chatId, fromName, upper, session);
+  }
+
+  // ---- Template keyword (only when idle: "TENANCY", "NDA", etc.) ----
+  if (!session) {
+    const tpl = findTemplate(upper);
+    if (tpl) return startTemplate(chatId, tpl);
   }
 
   // ---- Fallback ----
@@ -321,6 +345,109 @@ async function shareSignerLinks(
 }
 
 // ============================================================
+// Templates: create a document you don't have, then sign it
+// ============================================================
+function sendTemplatesMenu(chatId: string) {
+  const lines = TEMPLATES.map((t) => `• <b>${t.keyword}</b> — ${t.title}`).join("\n");
+  return sendText(
+    chatId,
+    `📝 <b>Create a document</b>\n\nNo file to upload? I can build one for you, then get it signed. ` +
+      `Reply with a keyword:\n\n${lines}\n\nFor example, reply <b>TENANCY</b>.`
+  );
+}
+
+async function startTemplate(chatId: string, tpl: DocTemplate) {
+  // Templates still count against the sender's allowance.
+  const gate = await canSend(chatId);
+  if (!gate.ok) return sendPaywall(chatId);
+
+  await setSession(chatId, "template_field", {
+    template_key: tpl.keyword,
+    field_index: 0,
+    values: {},
+  });
+  await sendText(
+    chatId,
+    `Let's create a <b>${tpl.title}</b>.\n\n${tpl.description}\n\n` +
+      `I'll ask a few questions — reply CANCEL any time.\n\n<b>${tpl.fields[0].label}</b>?`
+  );
+}
+
+async function onTemplateField(chatId: string, text: string, session: any) {
+  const tpl = findTemplate(session.data.template_key ?? "");
+  if (!tpl) {
+    await clearSession(chatId);
+    return sendText(chatId, "That template is no longer available — reply NEW to start over.");
+  }
+  const idx: number = session.data.field_index ?? 0;
+  const values: Record<string, string> = { ...(session.data.values ?? {}) };
+
+  if (!text.trim()) {
+    return sendText(chatId, `Please answer: <b>${tpl.fields[idx].label}</b>?`);
+  }
+  values[tpl.fields[idx].key] = text.trim();
+  const nextIdx = idx + 1;
+
+  if (nextIdx < tpl.fields.length) {
+    await setSession(chatId, "template_field", { ...session.data, values, field_index: nextIdx });
+    return sendText(chatId, `<b>${tpl.fields[nextIdx].label}</b>?`);
+  }
+
+  // All fields collected — render the document, store it, enter the signer flow.
+  const doc = await createGeneratedDoc(chatId, tpl.title, tpl.render(values));
+  if (!doc) {
+    await clearSession(chatId);
+    return sendText(chatId, "Couldn't build that document — reply NEW to try again.");
+  }
+  await setSession(chatId, "awaiting_signer_name", { document_id: doc.id, filename: doc.filename });
+  await sendText(
+    chatId,
+    `✅ Your <b>${tpl.title}</b> is ready.\n\nWho's signing it? Send me their name (just so it appears on the certificate).`
+  );
+}
+
+/** Renders template text to a PDF, stores it, and returns the documents row. */
+async function createGeneratedDoc(
+  chatId: string,
+  title: string,
+  body: string
+): Promise<{ id: string; filename: string } | null> {
+  try {
+    const { generatePdfFromText } = await import("@/lib/doctext");
+    const { createHash } = await import("crypto");
+    const pdf = await generatePdfFromText(title, body);
+    const bytes = Buffer.from(pdf);
+    const filename =
+      title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".pdf";
+
+    const supa = db();
+    const path = `docs/${chatId}-${Date.now()}-${filename}`;
+    const up = await supa.storage.from(BUCKET).upload(path, bytes, {
+      contentType: "application/pdf",
+      upsert: true,
+    });
+    if (up.error) {
+      console.error("tpl upload failed:", up.error.message);
+      return null;
+    }
+    const sha = createHash("sha256").update(bytes).digest("hex");
+    const { data: doc, error } = await supa
+      .from("documents")
+      .insert({ storage_path: path, filename, sha256: sha, size_bytes: bytes.length })
+      .select()
+      .single();
+    if (error) {
+      console.error("tpl doc insert failed:", JSON.stringify(error));
+      return null;
+    }
+    return { id: doc.id, filename };
+  } catch (e) {
+    console.error("createGeneratedDoc failed:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+// ============================================================
 // Signer flow: taps t.me link -> gets their signing page
 // ============================================================
 async function startSigner(chatId: string, fromName: string, signToken: string) {
@@ -506,16 +633,18 @@ function randomToken(): string {
 function welcome(name: string): string {
   return (
     `Hi ${name} 👋 I'm <b>Inkline</b> — I get documents signed right here in Telegram.\n\n` +
-    `📎 Send me a PDF to get started.\n\n` +
+    `📎 <b>Send me a PDF</b> to get it signed, or\n` +
+    `📝 <b>reply NEW</b> and I'll build the document for you (tenancy, NDA, invoice and more).\n\n` +
     `Type HELP anytime.`
   );
 }
 function helpText(): string {
   return (
     `<b>Inkline — help</b>\n\n` +
-    `📎 Send a PDF, tell me who's signing, and I'll give you a link to forward to them.\n` +
+    `📎 <b>Send a PDF</b> — tell me who's signing and I'll give you a link to forward. ` +
     `They tap it, sign in ~20 seconds, and you both get the certified copy back here.\n\n` +
-    `Commands: HELP · STATUS · BILLING · CANCEL`
+    `📝 <b>NEW</b> — don't have a file? I'll create one (tenancy agreement, NDA, freelance contract, invoice, receipt) then get it signed.\n\n` +
+    `Commands: NEW · STATUS · BILLING · CANCEL`
   );
 }
 

@@ -380,6 +380,17 @@ export async function buildAndDeliverFinal(requestId: string, _unused?: string):
       try {
         await sendDocument(chatId, dl.signedUrl, signedName, t("sign_done_signer"));
         await sendText(chatId, t("sign_thanks", { first: name.split(" ")[0] }));
+        // Referral loop: a SIGNER just experienced the product working, on someone
+        // else's document. Invite them to become a sender. (Not the sender — they
+        // already know the bot.) ?start=src_signer tags where they came from.
+        if (chatId !== request.sender_chat_id) {
+          await sendCtaLink(
+            chatId,
+            "Need something signed yourself? Start free — 3 documents on the house.",
+            "Try Inkline free",
+            `https://t.me/${BOT}?start=src_signer`
+          ).catch(() => {});
+        }
       } catch (e) {
         console.error("final delivery failed for", chatId, e instanceof Error ? e.message : e);
       }
