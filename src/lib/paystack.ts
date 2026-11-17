@@ -21,6 +21,19 @@ export function chatIdFromEmail(email: string | null | undefined): string | null
   return local.slice(3) || null;
 }
 
+/**
+ * The accounts.phone_e164 key for a Paystack customer email. Telegram customers
+ * use a synthetic tg-<chatId>@ email → 'tg:<chatId>'. Web customers use their
+ * real email → 'web:<email>'. This lets any Paystack webhook (including renewals
+ * that carry no metadata) map straight back to the right account.
+ */
+export function accountKeyFromEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  const chatId = chatIdFromEmail(email);
+  if (chatId) return `tg:${chatId}`;
+  return `web:${email.toLowerCase()}`;
+}
+
 async function paystack(path: string, method: "GET" | "POST", body?: unknown) {
   const key = process.env.PAYSTACK_SECRET_KEY;
   if (!key) {
@@ -48,7 +61,7 @@ async function paystack(path: string, method: "GET" | "POST", body?: unknown) {
  * Requires PAYSTACK_SECRET_KEY and PAYSTACK_PLAN_MONTHLY (a Plan code created in
  * the Paystack dashboard for ₦5,000/month, e.g. PLN_xxxxxxxx).
  */
-export async function initPaystackSubscription(chatId: string): Promise<string | null> {
+async function initCheckout(email: string, metadata: Record<string, unknown>): Promise<string | null> {
   const plan = process.env.PAYSTACK_PLAN_MONTHLY;
   const base = process.env.APP_BASE_URL ?? "https://www.inklinesign.com";
   if (!plan) {
@@ -56,14 +69,25 @@ export async function initPaystackSubscription(chatId: string): Promise<string |
     return null;
   }
   const data = await paystack("/transaction/initialize", "POST", {
-    email: emailForChat(chatId),
+    email,
     plan, // the plan sets the amount (₦5,000) and makes it recurring
     amount: PRICE_NAIRA * 100, // kobo — ignored when plan is set, sent for safety
     currency: "NGN",
     callback_url: `${base}/billing/success`,
-    metadata: { chat_id: chatId },
+    metadata,
   });
   return data?.authorization_url ?? null;
+}
+
+/** Telegram subscription — chat_id encoded into a synthetic email. */
+export async function initPaystackSubscription(chatId: string): Promise<string | null> {
+  return initCheckout(emailForChat(chatId), { chat_id: chatId, account_key: `tg:${chatId}` });
+}
+
+/** Web subscription — the sender's real email; account keyed 'web:<email>'. */
+export async function initPaystackSubscriptionForEmail(email: string): Promise<string | null> {
+  const key = `web:${email.toLowerCase()}`;
+  return initCheckout(email, { account_key: key });
 }
 
 /** Disables (cancels) a subscription. Needs the subscription code + email token. */

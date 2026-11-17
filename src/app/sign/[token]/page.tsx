@@ -117,15 +117,15 @@ export default function SignPage() {
         <div className="card center">
           <div className="tick">✓</div>
           <h1>Signed and sealed</h1>
-          <p className="mute">Your signed copy of <strong>{data.filename}</strong> is on its way to your Telegram, certificate included.</p>
+          <p className="mute">Your signed copy of <strong>{data.filename}</strong> is ready below — certificate included — and a copy is on its way to everyone involved.</p>
           {downloadUrl && <a className="doclink" href={downloadUrl} target="_blank" rel="noreferrer">Download your signed copy ↗</a>}
         </div>
         <div className="card center">
           <p className="mute" style={{ marginBottom: 12 }}>Need something signed yourself?</p>
-          <a className="primary" style={{ display: "inline-block", textDecoration: "none" }} href="https://t.me/InklineSignbot?start=src_signer" target="_blank" rel="noreferrer">
+          <a className="primary" style={{ display: "inline-block", textDecoration: "none" }} href="/app" rel="noreferrer">
             Try Inkline free →
           </a>
-          <p className="summary-fine" style={{ marginTop: 10 }}>3 free documents. No app, no account.</p>
+          <p className="summary-fine" style={{ marginTop: 10 }}>Free for 14 days. No card needed.</p>
         </div>
       </main>
     );

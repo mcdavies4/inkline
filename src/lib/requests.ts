@@ -41,6 +41,7 @@ export async function createDocument(bytes: Buffer, filename: string) {
 export interface SignerInput {
   phone: string;
   name: string;
+  email?: string | null;
 }
 
 export interface CreateRequestInput {
@@ -48,6 +49,7 @@ export interface CreateRequestInput {
   signers: SignerInput[];
   senderName: string;
   senderPhone?: string | null;
+  senderEmail?: string | null;
   message?: string | null;
   flow?: "sequential" | "parallel";
   requireOtp?: boolean;
@@ -84,6 +86,7 @@ export async function createRequestPending(input: CreateRequestInput): Promise<s
       document_id: doc.id,
       sender_name: input.senderName,
       sender_phone: input.senderPhone ?? null,
+      sender_email: input.senderEmail ?? null,
       message: input.message ?? null,
       mode,
       signing_flow: flow,
@@ -99,6 +102,7 @@ export async function createRequestPending(input: CreateRequestInput): Promise<s
     request_id: request.id,
     phone_e164: s.phone,
     name: s.name,
+    email: s.email ?? null,
     sign_token: randomBytes(24).toString("base64url"),
     sign_order: i + 1,
   }));
@@ -386,7 +390,7 @@ export async function buildAndDeliverFinal(requestId: string, _unused?: string):
         if (chatId !== request.sender_chat_id) {
           await sendCtaLink(
             chatId,
-            "Need something signed yourself? Start free — 3 documents on the house.",
+            "Need something signed yourself? Start free — 14 days, no card needed.",
             "Try Inkline free",
             `https://t.me/${BOT}?start=src_signer`
           ).catch(() => {});
@@ -400,6 +404,34 @@ export async function buildAndDeliverFinal(requestId: string, _unused?: string):
       event_type: "signed_pdf_delivered",
       meta: { recipients: recipients.size },
     });
+  }
+
+  // EMAIL DELIVERY (web parties): anyone reached by email rather than Telegram —
+  // web signers and the web sender — gets the certified copy by email too.
+  if (dl?.signedUrl) {
+    const { sendSignedCopyEmail } = await import("@/lib/email");
+    const emailed = new Set<string>();
+    for (const s of allSigners ?? []) {
+      if (s.email && !emailed.has(s.email.toLowerCase())) {
+        emailed.add(s.email.toLowerCase());
+        await sendSignedCopyEmail({
+          to: s.email,
+          name: s.name,
+          filename: document.filename,
+          downloadUrl: dl.signedUrl,
+        }).catch(() => {});
+      }
+    }
+    if (request.sender_email && !emailed.has(request.sender_email.toLowerCase())) {
+      emailed.add(request.sender_email.toLowerCase());
+      await sendSignedCopyEmail({
+        to: request.sender_email,
+        name: request.sender_name,
+        filename: document.filename,
+        downloadUrl: dl.signedUrl,
+        isSender: true,
+      }).catch(() => {});
+    }
   }
 
   return dl?.signedUrl ?? null;

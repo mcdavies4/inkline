@@ -5,10 +5,31 @@ export interface Account {
   documents_used: number;
   free_limit: number;
   plan: "free" | "active" | "past_due" | "cancelled";
-  provider: "stripe" | "flutterwave" | null;
+  provider: "stripe" | "flutterwave" | "paystack" | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   current_period_end: string | null;
+  created_at: string | null;
+}
+
+/**
+ * Billing model: a 14-day free trial from the account's first use, then a
+ * subscription. The trial is measured from accounts.created_at (set the first
+ * time a sender touches the product on either Telegram or the web), so there's
+ * no separate trial column to manage.
+ */
+export const TRIAL_DAYS = 14;
+
+export function withinTrial(createdAt: string | null | undefined): boolean {
+  if (!createdAt) return true; // brand-new / unknown → treat as in-trial
+  return Date.now() - new Date(createdAt).getTime() < TRIAL_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/** Days left in the trial (0 once expired). */
+export function trialDaysLeft(createdAt: string | null | undefined): number {
+  if (!createdAt) return TRIAL_DAYS;
+  const elapsedMs = Date.now() - new Date(createdAt).getTime();
+  return Math.max(0, Math.ceil((TRIAL_DAYS * 24 * 60 * 60 * 1000 - elapsedMs) / (24 * 60 * 60 * 1000)));
 }
 
 /** Fetches or creates the account row for a sender. */
@@ -26,12 +47,12 @@ export async function getAccount(phone: string): Promise<Account> {
   return created as Account;
 }
 
-/** True if this sender can start another document right now. */
+/** True if this sender can start another document right now (active plan or in trial). */
 export async function canSend(phone: string): Promise<{ ok: boolean; account: Account; remaining: number }> {
   const account = await getAccount(phone);
   if (account.plan === "active") return { ok: true, account, remaining: Infinity };
-  const remaining = Math.max(0, account.free_limit - account.documents_used);
-  return { ok: remaining > 0, account, remaining };
+  const ok = withinTrial(account.created_at);
+  return { ok, account, remaining: ok ? Infinity : 0 };
 }
 
 /** Increments the lifetime document counter after a successful send. */

@@ -499,18 +499,22 @@ async function canSend(chatId: string): Promise<{ ok: boolean; used: number; lim
   if (!data) {
     // accounts.phone_e164 is the NOT NULL primary key. Telegram has no phone, so
     // store a tg: marker as the key and keep the chat_id in tg_chat_id too.
+    // created_at (default now()) starts their 14-day free trial.
     await supa.from("accounts").insert({
       phone_e164: `tg:${chatId}`,
       tg_chat_id: chatId,
       documents_used: 0,
       free_limit: 3,
-      plan: "free",        // allowed: 'free' | 'active' | 'past_due' | 'cancelled'
-      provider: "stripe",  // allowed: 'stripe' | 'flutterwave' (required by check)
+      plan: "free",          // allowed: 'free' | 'active' | 'past_due' | 'cancelled'
+      provider: "paystack",  // allowed: 'stripe' | 'flutterwave' | 'paystack'
     });
-    return { ok: true, used: 0, limit: 3 };
+    return { ok: true, used: 0, limit: Infinity };
   }
   if (data.plan === "active") return { ok: true, used: data.documents_used, limit: Infinity };
-  return { ok: data.documents_used < data.free_limit, used: data.documents_used, limit: data.free_limit };
+  // 14-day free trial, measured from account creation.
+  const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
+  const inTrial = data.created_at ? Date.now() - new Date(data.created_at).getTime() < TRIAL_MS : true;
+  return { ok: inTrial, used: data.documents_used ?? 0, limit: Infinity };
 }
 
 async function recordDocumentSent(chatId: string) {
@@ -529,7 +533,7 @@ async function startSubscribe(chatId: string, paywall: boolean) {
   if (!url) {
     return sendText(chatId, "Couldn't open checkout just now — please try again shortly.");
   }
-  const intro = paywall ? "You've used your 3 free documents 🎉" : "<b>Inkline Unlimited</b>";
+  const intro = paywall ? "Your 14-day free trial has ended 🎉" : "<b>Inkline Unlimited</b>";
   await sendCtaLink(
     chatId,
     `${intro}\n\nGo unlimited for <b>${PAYSTACK_PRICE_LABEL}</b> — unlimited documents and signers, cancel anytime.`,

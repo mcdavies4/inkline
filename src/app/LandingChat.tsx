@@ -46,8 +46,17 @@ export default function LandingChat() {
             <a className="cta" href={BOT_URL} target="_blank" rel="noopener noreferrer">
               <Plane /> Start on Telegram
             </a>
-            <span className="cta-note">3 free documents<br />no card needed</span>
+            <a
+              className="cta"
+              href="/app"
+              style={{ background: "transparent", color: "inherit", boxShadow: "inset 0 0 0 1.5px currentColor" }}
+            >
+              Sign on the web →
+            </a>
           </div>
+          <span className="cta-note" style={{ display: "block", marginTop: 12 }}>
+            Free for 14 days · no card needed · not on Telegram? Send straight from the web
+          </span>
         </div>
 
         <div className="hero-r">

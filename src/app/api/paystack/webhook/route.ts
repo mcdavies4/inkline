@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 import { sendText } from "@/lib/telegram";
-import { chatIdFromEmail } from "@/lib/paystack";
+import { accountKeyFromEmail } from "@/lib/paystack";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -36,8 +36,15 @@ export async function POST(req: NextRequest) {
   const db = supabaseAdmin();
   const data = event.data ?? {};
   const email: string | undefined = data.customer?.email;
-  const chatId = chatIdFromEmail(email) ?? (data.metadata?.chat_id as string | undefined) ?? null;
-  const key = chatId ? `tg:${chatId}` : null;
+  // Prefer the account_key we stamped into metadata; fall back to deriving it
+  // from the customer email (works for renewals that carry no metadata).
+  const key =
+    (data.metadata?.account_key as string | undefined) ??
+    accountKeyFromEmail(email) ??
+    (data.metadata?.chat_id ? `tg:${data.metadata.chat_id}` : null);
+  // Only Telegram accounts can be messaged back here; web accounts see the
+  // billing success page instead.
+  const chatId = key?.startsWith("tg:") ? key.slice(3) : null;
 
   try {
     switch (event.event) {
