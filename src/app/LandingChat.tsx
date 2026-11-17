@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react";
 
 const BOT_URL = "https://t.me/InklineSignbot?start=hello";
+const APP_URL = "/app";
 // Override via NEXT_PUBLIC_PRICE_LABEL when the plan/currency changes (e.g. "$5/month").
 const PRICE_LABEL = process.env.NEXT_PUBLIC_PRICE_LABEL ?? "₦10,000/month";
 const [PRICE_AMOUNT, ...PRICE_REST] = PRICE_LABEL.split("/");
 
 const SCRIPT: { who: "them" | "bot"; kind: "text" | "doc" | "signed"; text?: string; label?: string; note?: string }[] = [
   { who: "them", kind: "doc", label: "tenancy-agreement.pdf" },
-  { who: "bot", kind: "text", text: "Got it. Who's signing?" },
+  { who: "bot", kind: "text", text: "Got it. Who needs to sign?" },
   { who: "them", kind: "text", text: "James Carter" },
-  { who: "bot", kind: "text", text: "Here's the link to send James 👇" },
+  { who: "bot", kind: "text", text: "Here's his signing link 👇 send it however you like" },
   { who: "bot", kind: "signed", label: "tenancy-agreement · signed.pdf", note: "Signed and sent back to everyone." },
 ];
 
@@ -30,36 +31,28 @@ export default function LandingChat() {
 
       <nav className="nav">
         <div className="logo">Inkline<i /></div>
-        <a className="nav-cta" href={BOT_URL} target="_blank" rel="noopener noreferrer">Open bot</a>
+        <a className="nav-cta" href={APP_URL}>Sign a document</a>
       </nav>
 
       <section className="hero">
         <div className="hero-l">
-          <div className="kicker"><span className="pulse" />Live on Telegram</div>
+          <div className="kicker"><span className="pulse" />No app · no account · ~20 seconds</div>
           <h1 className="h1">
             Get it<br />
             <em>signed</em><br />
-            in the chat.
+            in seconds.
           </h1>
           <p className="lede">
-            Send a PDF. Get it back signed and certified. No app to learn, no account,
-            about twenty seconds.
+            Send a PDF. Your signer taps a link and signs from their phone — no app to install,
+            no account to create. On the web or in Telegram.
           </p>
           <div className="cta-row">
-            <a className="cta" href={BOT_URL} target="_blank" rel="noopener noreferrer">
-              <Plane /> Start on Telegram
-            </a>
-            <a
-              className="cta"
-              href="/app"
-              style={{ background: "transparent", color: "inherit", boxShadow: "inset 0 0 0 1.5px currentColor" }}
-            >
-              Sign on the web →
+            <a className="cta" href={APP_URL}>Sign a document →</a>
+            <a className="cta tg" href={BOT_URL} target="_blank" rel="noopener noreferrer">
+              <Plane /> Telegram bot
             </a>
           </div>
-          <span className="cta-note" style={{ display: "block", marginTop: 12 }}>
-            Free for 14 days · no card needed · not on Telegram? Send straight from the web
-          </span>
+          <span className="cta-note">Free for 14 days · no card needed</span>
         </div>
 
         <div className="hero-r">
@@ -68,7 +61,7 @@ export default function LandingChat() {
               <div className="pa">I</div>
               <div>
                 <div className="pn">Inkline</div>
-                <div className="ps">bot</div>
+                <div className="ps">signing</div>
               </div>
             </div>
             <div className="thread">
@@ -91,22 +84,22 @@ export default function LandingChat() {
       </div>
 
       <section className="how">
-        <h2 className="h2">Three messages.<br /><span className="dim">That&apos;s the whole product.</span></h2>
+        <h2 className="h2">Three steps.<br /><span className="dim">That&apos;s the whole product.</span></h2>
         <ol className="steps">
           <li>
             <b>01</b>
             <h3>Send a PDF</h3>
-            <p>Forward any document to the bot. It asks who&apos;s signing.</p>
+            <p>Upload any document on the web, or send it to the Telegram bot. Add who needs to sign.</p>
           </li>
           <li>
             <b>02</b>
             <h3>Share the link</h3>
-            <p>You get a link. Send it to your signer however you already talk to them.</p>
+            <p>You get a signing link — we email it to your signer, or you share it however you already talk to them.</p>
           </li>
           <li>
             <b>03</b>
-            <h3>Signed &amp; sealed</h3>
-            <p>They sign with a finger. You both get the certified copy back in chat.</p>
+            <h3>Signed &amp; returned</h3>
+            <p>They tap where to sign and draw it with a finger. Everyone gets the signed copy back.</p>
           </li>
         </ol>
       </section>
@@ -115,21 +108,22 @@ export default function LandingChat() {
         <div className="proof-l">
           <h2 className="h2 light">Not a squiggle.<br /><em>Proof.</em></h2>
           <p className="proof-p">
-            Every signature is timestamped, fingerprinted and bound to an audit trail —
-            sent, opened, signed, returned. The certificate travels with the document.
+            Every signature is timestamped and bound to an audit trail — sent, opened, signed,
+            returned — kept on record for you. And the signed file stays clean: your original
+            document, with just the signature added where it belongs.
           </p>
           <ul className="ticks">
-            <li>Tamper-evident SHA-256 fingerprint</li>
-            <li>Full audit trail on every document</li>
-            <li>Certificate page appended automatically</li>
+            <li>Timestamped, attributable signatures</li>
+            <li>Full audit trail kept on every document</li>
+            <li>Clean signed PDF — nothing added but the signature</li>
             <li>Legally recognised electronic signatures</li>
           </ul>
         </div>
         <div className="cert">
-          <div className="cert-h">Certificate of signing</div>
+          <div className="cert-h">Signing record</div>
           <dl>
             <div><dt>Signer</dt><dd>James Carter</dd></div>
-            <div><dt>Signed</dt><dd className="mono">2026-07-29 09:41</dd></div>
+            <div><dt>Signed</dt><dd className="mono">2026-11-17 09:41</dd></div>
             <div><dt>Document</dt><dd>tenancy-agreement.pdf</dd></div>
             <div><dt>Fingerprint</dt><dd className="mono">9f2ab4…e07c1d</dd></div>
           </dl>
@@ -151,21 +145,20 @@ export default function LandingChat() {
             <p>Unlimited documents and signers, after your trial. Pay by card. Cancel anytime.</p>
           </div>
         </div>
-        <a className="cta big" href={BOT_URL} target="_blank" rel="noopener noreferrer">
-          <Plane /> Start free on Telegram
-        </a>
+        <a className="cta big" href={APP_URL}>Start free →</a>
+        <p className="price-alt">or <a href={BOT_URL} target="_blank" rel="noopener noreferrer">use the Telegram bot</a></p>
       </section>
 
       <footer className="foot">
         <div className="logo">Inkline<i /></div>
         <nav>
           <a href="/blog">Blog</a>
-          <a href="/app">Sign on the web</a>
+          <a href={APP_URL}>Sign a document</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="mailto:inklinesign@outlook.com">Contact</a>
         </nav>
-        <p>© {new Date().getFullYear()} The 36th Company Ltd · e-signatures over Telegram</p>
+        <p>© {new Date().getFullYear()} The 36th Company Ltd · legally recognised e-signatures, on the web and Telegram</p>
       </footer>
     </main>
   );
@@ -218,18 +211,22 @@ const CSS = `
 .h1{font-size:clamp(52px,8vw,104px);font-weight:800;line-height:.9;letter-spacing:-4.5px;margin:0 0 26px;}
 .h1 em{font-style:normal;color:var(--green);position:relative;}
 .h1 em::after{content:"";position:absolute;left:2%;right:-2%;bottom:.12em;height:.1em;background:var(--green);opacity:.22;border-radius:4px;}
-.lede{font-size:19px;line-height:1.5;color:var(--deep);max-width:34ch;margin:0 0 34px;}
-.cta-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
-.cta{display:inline-flex;align-items:center;gap:10px;background:var(--tg);color:#fff;text-decoration:none;
-  font-weight:700;font-size:17px;padding:16px 26px;border-radius:100px;box-shadow:0 10px 28px rgba(34,158,217,.28);
+.lede{font-size:19px;line-height:1.5;color:var(--deep);max-width:36ch;margin:0 0 34px;}
+.cta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.cta{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--green);text-decoration:none;
+  font-weight:700;font-size:17px;padding:16px 26px;border-radius:100px;box-shadow:0 10px 28px rgba(10,26,20,.22);
   transition:transform .16s ease,box-shadow .16s ease;}
-.cta:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(34,158,217,.34);}
+.cta:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(10,26,20,.3);}
+.cta.tg{background:var(--tg);color:#fff;box-shadow:0 10px 28px rgba(34,158,217,.26);}
+.cta.tg:hover{box-shadow:0 16px 34px rgba(34,158,217,.32);}
 .cta.big{font-size:18px;padding:18px 32px;margin-top:36px;}
-.cta-note{font-size:13.5px;color:var(--deep);font-weight:600;line-height:1.35;opacity:.85;}
+.cta-note{display:block;margin-top:14px;font-size:13.5px;color:var(--deep);font-weight:600;line-height:1.35;opacity:.85;}
+.price-alt{margin:16px 0 0;font-size:14.5px;color:var(--deep);}
+.price-alt a{color:var(--tg);font-weight:700;text-decoration:none;}
 
 .phone{background:var(--ink);border-radius:30px;padding:16px;box-shadow:0 36px 70px -20px rgba(10,26,20,.45);}
 .phone-top{display:flex;align-items:center;gap:11px;padding:8px 10px 15px;border-bottom:1px solid rgba(255,255,255,.08);}
-.pa{width:38px;height:38px;border-radius:50%;background:var(--tg);color:#fff;display:grid;place-items:center;font-weight:800;font-size:17px;}
+.pa{width:38px;height:38px;border-radius:50%;background:var(--deep);color:#fff;display:grid;place-items:center;font-weight:800;font-size:17px;}
 .pn{color:var(--paper);font-weight:700;font-size:16px;line-height:1.2;}
 .ps{color:var(--green);font-size:12px;font-weight:600;}
 .thread{display:flex;flex-direction:column;gap:9px;padding:16px 4px 6px;min-height:342px;}
@@ -267,7 +264,7 @@ const CSS = `
 .steps p{margin:0;color:var(--deep);font-size:15.5px;line-height:1.5;}
 
 .proof{background:var(--ink);padding:86px 28px;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;}
-.proof-p{color:rgba(246,255,250,.72);font-size:17px;line-height:1.55;max-width:44ch;margin:0 0 26px;}
+.proof-p{color:rgba(246,255,250,.72);font-size:17px;line-height:1.55;max-width:46ch;margin:0 0 26px;}
 .ticks{list-style:none;margin:0;padding:0;display:grid;gap:11px;}
 .ticks li{color:var(--paper);font-size:15px;font-weight:500;padding-left:26px;position:relative;opacity:.9;}
 .ticks li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:800;}

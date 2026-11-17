@@ -6,17 +6,17 @@ const GTM_ID = "GTM-PQ98F6T9";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://inklinesign.com"),
-  title: "Inkline — sign documents on Telegram or the web",
+  title: "Inkline — get documents signed in seconds",
   description:
-    "Send a PDF, get it signed with a real handwritten signature — on Telegram or straight from your browser. No app, no account, about 20 seconds.",
+    "Send a PDF and get it signed with a real signature in about 20 seconds. No app to install and no account for your signer — on the web or in Telegram.",
   // The site is indexable by default; private sections (sign, place, admin,
   // dashboard, billing) set their own noindex in their layouts.
   robots: { index: true, follow: true },
   icons: { icon: "/favicon.png", apple: "/icon.svg" },
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Inkline — sign documents on Telegram or the web",
-    description: "No app, no account. Send a PDF, get it signed in about 20 seconds.",
+    title: "Inkline — get documents signed in seconds",
+    description: "No app, no account for your signer. Send a PDF, get it signed in about 20 seconds — on the web or in Telegram.",
     url: "https://inklinesign.com",
     siteName: "Inkline",
     images: ["/og-image.png"],
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Inkline — sign documents on Telegram or the web",
-    description: "No app, no account. Send a PDF, get it signed in about 20 seconds.",
+    title: "Inkline — get documents signed in seconds",
+    description: "No app, no account for your signer. Send a PDF, get it signed in about 20 seconds — on the web or in Telegram.",
     images: ["/og-image.png"],
   },
 };
