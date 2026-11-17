@@ -159,6 +159,8 @@ export default function LandingChat() {
       <footer className="foot">
         <div className="logo">Inkline<i /></div>
         <nav>
+          <a href="/blog">Blog</a>
+          <a href="/app">Sign on the web</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="mailto:inklinesign@outlook.com">Contact</a>
