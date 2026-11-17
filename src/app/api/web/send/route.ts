@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createDocument, createRequestPending } from "@/lib/requests";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getAccount, withinTrial } from "@/lib/billing";
-import { initPaystackSubscriptionForEmail, PAYSTACK_PRICE_LABEL } from "@/lib/paystack";
+import { checkoutOptionsForEmail } from "@/lib/paystack";
 import { sendSignRequestEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -91,13 +91,12 @@ export async function POST(req: NextRequest) {
   }
   const allowed = account.plan === "active" || withinTrial(account.created_at);
   if (!allowed) {
-    const checkoutUrl = await initPaystackSubscriptionForEmail(senderEmail);
+    const options = await checkoutOptionsForEmail(senderEmail);
     return NextResponse.json(
       {
         error: "Your 14-day free trial has ended.",
         needsSubscription: true,
-        checkoutUrl,
-        priceLabel: PAYSTACK_PRICE_LABEL,
+        options, // [{ currency, label, url }] — one per configured currency
       },
       { status: 402 }
     );

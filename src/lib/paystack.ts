@@ -4,11 +4,32 @@
 // event — including renewals that carry none of our metadata — be mapped back
 // to the right account just from the customer's email.
 
-const PRICE_NAIRA = 5000;
-// Override via PAYSTACK_PRICE_LABEL env when you change the plan/currency
-// (e.g. "$5/month" on an international account). Pure env change, no redeploy
-// of code needed.
-export const PAYSTACK_PRICE_LABEL = process.env.PAYSTACK_PRICE_LABEL ?? "₦5,000/month";
+// Two currencies, each its own Paystack plan (plans are single-currency).
+//   NGN → PAYSTACK_PLAN_NGN (falls back to legacy PAYSTACK_PLAN_MONTHLY)
+//   USD → PAYSTACK_PLAN_USD (optional — USD option only appears when set)
+// Labels are env-overridable so price/currency changes never touch code.
+export type Currency = "NGN" | "USD";
+
+export function planCodeFor(currency: Currency): string | undefined {
+  if (currency === "USD") return process.env.PAYSTACK_PLAN_USD || undefined;
+  return process.env.PAYSTACK_PLAN_NGN || process.env.PAYSTACK_PLAN_MONTHLY || undefined;
+}
+
+export function priceLabelFor(currency: Currency): string {
+  if (currency === "USD") return process.env.PAYSTACK_PRICE_LABEL_USD ?? "$10/month";
+  return process.env.PAYSTACK_PRICE_LABEL_NGN ?? process.env.PAYSTACK_PRICE_LABEL ?? "₦10,000/month";
+}
+
+/** Currencies that are actually configured (have a plan code). NGN always; USD if set. */
+export function availableCurrencies(): Currency[] {
+  const out: Currency[] = [];
+  if (planCodeFor("NGN")) out.push("NGN");
+  if (planCodeFor("USD")) out.push("USD");
+  return out;
+}
+
+/** Back-compat: the primary (NGN) label, used where only one is shown. */
+export const PAYSTACK_PRICE_LABEL = priceLabelFor("NGN");
 
 const EMAIL_DOMAIN = "users.inklinesign.com";
 
@@ -60,37 +81,57 @@ async function paystack(path: string, method: "GET" | "POST", body?: unknown) {
 }
 
 /**
- * Starts a ₦5,000/month subscription and returns the checkout URL.
- * Requires PAYSTACK_SECRET_KEY and PAYSTACK_PLAN_MONTHLY (a Plan code created in
- * the Paystack dashboard for ₦5,000/month, e.g. PLN_xxxxxxxx).
+ * Starts a recurring subscription and returns the checkout URL. The plan (set in
+ * the Paystack dashboard) governs the amount + currency, so we pass only the
+ * plan — no hardcoded amount/currency, which keeps NGN and USD plans clean.
  */
-async function initCheckout(email: string, metadata: Record<string, unknown>): Promise<string | null> {
-  const plan = process.env.PAYSTACK_PLAN_MONTHLY;
+async function initCheckout(
+  email: string,
+  currency: Currency,
+  metadata: Record<string, unknown>
+): Promise<string | null> {
+  const plan = planCodeFor(currency);
   const base = process.env.APP_BASE_URL ?? "https://www.inklinesign.com";
   if (!plan) {
-    console.error("PAYSTACK: PAYSTACK_PLAN_MONTHLY missing");
+    console.error(`PAYSTACK: no plan code for ${currency} (set PAYSTACK_PLAN_${currency})`);
     return null;
   }
   const data = await paystack("/transaction/initialize", "POST", {
     email,
-    plan, // the plan sets the amount (₦5,000) and makes it recurring
-    amount: PRICE_NAIRA * 100, // kobo — ignored when plan is set, sent for safety
-    currency: "NGN",
+    plan, // the plan sets the amount + currency and makes it recurring
     callback_url: `${base}/billing/success`,
-    metadata,
+    metadata: { ...metadata, currency },
   });
   return data?.authorization_url ?? null;
 }
 
-/** Telegram subscription — chat_id encoded into a synthetic email. */
-export async function initPaystackSubscription(chatId: string): Promise<string | null> {
-  return initCheckout(emailForChat(chatId), { chat_id: chatId, account_key: `tg:${chatId}` });
+/** Telegram subscription — chat_id encoded into a synthetic email. Naira. */
+export async function initPaystackSubscription(
+  chatId: string,
+  currency: Currency = "NGN"
+): Promise<string | null> {
+  return initCheckout(emailForChat(chatId), currency, { chat_id: chatId, account_key: `tg:${chatId}` });
 }
 
 /** Web subscription — the sender's real email; account keyed 'web:<email>'. */
-export async function initPaystackSubscriptionForEmail(email: string): Promise<string | null> {
+export async function initPaystackSubscriptionForEmail(
+  email: string,
+  currency: Currency = "NGN"
+): Promise<string | null> {
   const key = `web:${email.toLowerCase()}`;
-  return initCheckout(email, { account_key: key });
+  return initCheckout(email, currency, { account_key: key });
+}
+
+/** Every configured currency's checkout option (label + URL), for the web paywall. */
+export async function checkoutOptionsForEmail(
+  email: string
+): Promise<{ currency: Currency; label: string; url: string }[]> {
+  const out: { currency: Currency; label: string; url: string }[] = [];
+  for (const currency of availableCurrencies()) {
+    const url = await initPaystackSubscriptionForEmail(email, currency);
+    if (url) out.push({ currency, label: priceLabelFor(currency), url });
+  }
+  return out;
 }
 
 /** Disables (cancels) a subscription. Needs the subscription code + email token. */

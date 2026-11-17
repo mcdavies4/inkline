@@ -15,7 +15,7 @@ export default function WebSendPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ filename: string; signers: SentSigner[] } | null>(null);
-  const [checkout, setCheckout] = useState<{ url: string | null; price: string } | null>(null);
+  const [checkout, setCheckout] = useState<{ currency: string; label: string; url: string }[] | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -57,7 +57,7 @@ export default function WebSendPage() {
       const r = await fetch("/api/web/send", { method: "POST", body: fd });
       const j = await r.json();
       if (r.status === 402 && j.needsSubscription) {
-        setCheckout({ url: j.checkoutUrl ?? null, price: j.priceLabel ?? "₦5,000/month" });
+        setCheckout(Array.isArray(j.options) ? j.options : []);
         return;
       }
       if (!r.ok) throw new Error(j.error ?? "Something went wrong. Please try again.");
@@ -78,12 +78,20 @@ export default function WebSendPage() {
           <p className="eyebrow">Your free trial has ended</p>
           <h1 style={{ margin: "0 0 10px", fontSize: 22 }}>Keep sending with Inkline Unlimited</h1>
           <p className="mute" style={{ marginBottom: 16 }}>
-            Unlimited documents and signers for <strong>{checkout.price}</strong>. Cancel anytime.
+            Unlimited documents and signers. Cancel anytime.
+            {checkout.length > 1 && " Choose how you'd like to pay:"}
           </p>
-          {checkout.url ? (
-            <a className="primary" style={{ display: "inline-block", textDecoration: "none" }} href={checkout.url}>
-              Subscribe — {checkout.price}
-            </a>
+          {checkout.length > 0 ? (
+            checkout.map((opt) => (
+              <a
+                key={opt.currency}
+                className="primary"
+                style={{ display: "block", textDecoration: "none", marginTop: 10 }}
+                href={opt.url}
+              >
+                Subscribe — {opt.label}
+              </a>
+            ))
           ) : (
             <p className="err">Couldn&apos;t open checkout just now. Please try again shortly.</p>
           )}
