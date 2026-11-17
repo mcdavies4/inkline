@@ -537,7 +537,7 @@ async function startSubscribe(chatId: string, paywall: boolean) {
   await sendCtaLink(
     chatId,
     `${intro}\n\nGo unlimited for <b>${PAYSTACK_PRICE_LABEL}</b> — unlimited documents and signers, cancel anytime.`,
-    "Subscribe — ₦5,000/month",
+    `Subscribe — ${PAYSTACK_PRICE_LABEL}`,
     url
   );
 }
@@ -549,11 +549,12 @@ async function sendPaywall(chatId: string) {
 /** BILLING command — subscription status, or the subscribe link. */
 async function handleBilling(chatId: string) {
   const { getAccount } = await import("@/lib/billing");
+  const { PAYSTACK_PRICE_LABEL } = await import("@/lib/paystack");
   const account = await getAccount(`tg:${chatId}`);
   if (account.plan === "active" || account.plan === "past_due") {
     return sendText(
       chatId,
-      `You're on <b>Inkline Unlimited</b> (₦5,000/month).\n\n` +
+      `You're on <b>Inkline Unlimited</b> (${PAYSTACK_PRICE_LABEL}).\n\n` +
         (account.plan === "past_due" ? "⚠️ Your last payment failed — reply PAY to renew.\n\n" : "") +
         `To cancel, reply <b>CANCELSUB</b>.`
     );

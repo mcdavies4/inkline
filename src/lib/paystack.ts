@@ -5,7 +5,10 @@
 // to the right account just from the customer's email.
 
 const PRICE_NAIRA = 5000;
-export const PAYSTACK_PRICE_LABEL = "₦5,000/month";
+// Override via PAYSTACK_PRICE_LABEL env when you change the plan/currency
+// (e.g. "$5/month" on an international account). Pure env change, no redeploy
+// of code needed.
+export const PAYSTACK_PRICE_LABEL = process.env.PAYSTACK_PRICE_LABEL ?? "₦5,000/month";
 
 const EMAIL_DOMAIN = "users.inklinesign.com";
 

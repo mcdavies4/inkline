@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 
 const BOT_URL = "https://t.me/InklineSignbot?start=hello";
+// Override via NEXT_PUBLIC_PRICE_LABEL when the plan/currency changes (e.g. "$5/month").
+const PRICE_LABEL = process.env.NEXT_PUBLIC_PRICE_LABEL ?? "₦5,000/month";
+const [PRICE_AMOUNT, ...PRICE_REST] = PRICE_LABEL.split("/");
 
 const SCRIPT: { who: "them" | "bot"; kind: "text" | "doc" | "signed"; text?: string; label?: string; note?: string }[] = [
   { who: "them", kind: "doc", label: "tenancy-agreement.pdf" },
@@ -138,14 +141,14 @@ export default function LandingChat() {
         <h2 className="h2">Priced like a tool,<br /><span className="dim">not a subscription trap.</span></h2>
         <div className="cards">
           <div className="card">
-            <div className="c-k">Free</div>
-            <div className="c-v">3 <span>documents</span></div>
-            <p>Everything included. No card, no trial timer.</p>
+            <div className="c-k">Free trial</div>
+            <div className="c-v">14 <span>days</span></div>
+            <p>Everything included. No card needed to start.</p>
           </div>
           <div className="card pro">
             <div className="c-k">Unlimited</div>
-            <div className="c-v">₦5,000<span>/month</span></div>
-            <p>Unlimited documents and signers. Pay with card, bank transfer or USSD. Cancel anytime.</p>
+            <div className="c-v">{PRICE_AMOUNT}{PRICE_REST.length ? <span>/{PRICE_REST.join("/")}</span> : null}</div>
+            <p>Unlimited documents and signers, after your trial. Pay by card. Cancel anytime.</p>
           </div>
         </div>
         <a className="cta big" href={BOT_URL} target="_blank" rel="noopener noreferrer">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createDocument, createRequestPending } from "@/lib/requests";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getAccount, withinTrial } from "@/lib/billing";
-import { initPaystackSubscriptionForEmail } from "@/lib/paystack";
+import { initPaystackSubscriptionForEmail, PAYSTACK_PRICE_LABEL } from "@/lib/paystack";
 import { sendSignRequestEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
         error: "Your 14-day free trial has ended.",
         needsSubscription: true,
         checkoutUrl,
-        priceLabel: "₦5,000/month",
+        priceLabel: PAYSTACK_PRICE_LABEL,
       },
       { status: 402 }
     );
