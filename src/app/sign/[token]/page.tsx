@@ -117,7 +117,7 @@ export default function SignPage() {
         <div className="card center">
           <div className="tick">✓</div>
           <h1>Signed and sealed</h1>
-          <p className="mute">Your signed copy of <strong>{data.filename}</strong> is ready below — certificate included — and a copy is on its way to everyone involved.</p>
+          <p className="mute">Your signed copy of <strong>{data.filename}</strong> is ready below, and a copy is on its way to everyone involved.</p>
           {downloadUrl && <a className="doclink" href={downloadUrl} target="_blank" rel="noreferrer">Download your signed copy ↗</a>}
         </div>
         <div className="card center">

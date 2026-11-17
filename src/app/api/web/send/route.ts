@@ -35,6 +35,12 @@ export async function POST(req: NextRequest) {
   const message = String(form.get("message") ?? "").trim() || null;
   const file = form.get("file") as File | null;
 
+  // Extra recipients for the finished copy (comma / space / newline separated).
+  const ccEmails = String(form.get("cc_emails") ?? "")
+    .split(/[,\s;]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
   let signers: { name: string; email: string | null }[] = [];
   try {
     const raw = JSON.parse(String(form.get("signers") ?? "[]"));
@@ -67,6 +73,12 @@ export async function POST(req: NextRequest) {
     if (s.email && !EMAIL_RE.test(s.email))
       return NextResponse.json({ error: `“${s.email}” doesn't look like a valid email.` }, { status: 400 });
   }
+  for (const cc of ccEmails) {
+    if (!EMAIL_RE.test(cc))
+      return NextResponse.json({ error: `“${cc}” doesn't look like a valid email.` }, { status: 400 });
+  }
+  if (ccEmails.length > 10)
+    return NextResponse.json({ error: "Up to 10 extra recipients." }, { status: 400 });
 
   // ---- Billing gate: active plan or still within the 14-day trial ----
   const accountKey = `web:${senderEmail}`;
@@ -98,6 +110,7 @@ export async function POST(req: NextRequest) {
       documentId: doc.id,
       senderName,
       senderEmail,
+      ccEmails,
       message,
       signers: signers.map((s) => ({
         name: s.name,

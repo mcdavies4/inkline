@@ -50,6 +50,7 @@ export interface CreateRequestInput {
   senderName: string;
   senderPhone?: string | null;
   senderEmail?: string | null;
+  ccEmails?: string[] | null;
   message?: string | null;
   flow?: "sequential" | "parallel";
   requireOtp?: boolean;
@@ -95,6 +96,7 @@ export async function createRequestPending(input: CreateRequestInput): Promise<s
     status: "pending",
   };
   if (input.senderEmail) reqInsert.sender_email = input.senderEmail;
+  if (input.ccEmails && input.ccEmails.length > 0) reqInsert.cc_emails = input.ccEmails.join(",");
 
   const { data: request, error: reqErr } = await db
     .from("sign_requests")
@@ -438,6 +440,22 @@ export async function buildAndDeliverFinal(requestId: string, _unused?: string):
         filename: document.filename,
         downloadUrl: dl.signedUrl,
         isSender: true,
+      }).catch(() => {});
+    }
+    // Extra recipients (cc_emails): people who should receive the signed copy
+    // without signing — an agent, a co-owner, an archive address.
+    const cc = String(request.cc_emails ?? "")
+      .split(/[,\s;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    for (const addr of cc) {
+      if (emailed.has(addr)) continue;
+      emailed.add(addr);
+      await sendSignedCopyEmail({
+        to: addr,
+        name: "there",
+        filename: document.filename,
+        downloadUrl: dl.signedUrl,
       }).catch(() => {});
     }
   }

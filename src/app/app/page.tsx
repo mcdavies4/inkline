@@ -9,6 +9,7 @@ export default function WebSendPage() {
   const [senderName, setSenderName] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [cc, setCc] = useState("");
   const [signers, setSigners] = useState<Signer[]>([{ name: "", email: "" }]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,6 +51,7 @@ export default function WebSendPage() {
       fd.set("sender_email", senderEmail.trim());
       if (message.trim()) fd.set("message", message.trim());
       fd.set("signers", JSON.stringify(cleanSigners));
+      if (cc.trim()) fd.set("cc_emails", cc.trim());
       fd.set("file", file);
 
       const r = await fetch("/api/web/send", { method: "POST", body: fd });
@@ -192,6 +194,11 @@ export default function WebSendPage() {
         <div className="field">
           <label>Message <span className="opt">(optional)</span></label>
           <textarea className="field-input" rows={2} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="A quick note for the signers…" />
+        </div>
+        <div className="field">
+          <label>Also email the signed copy to <span className="opt">(optional)</span></label>
+          <textarea className="field-input" rows={2} value={cc} onChange={(e) => setCc(e.target.value)} placeholder="colleague@company.com, archive@company.com" />
+          <p className="field-hint">Extra people who should get the finished document but don&apos;t need to sign. Separate with commas.</p>
         </div>
       </div>
 

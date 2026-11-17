@@ -11,6 +11,10 @@ alter table signers add column if not exists email text;
 -- (Telegram senders keep using sender_chat_id; this stays null for them.)
 alter table sign_requests add column if not exists sender_email text;
 
+-- Extra recipients (comma-separated) who should receive the finished signed
+-- copy but are not signers themselves — e.g. an agent, a co-owner, an archive.
+alter table sign_requests add column if not exists cc_emails text;
+
 -- Web accounts are keyed phone_e164 = 'web:<email>' (mirrors the 'tg:<chatId>'
 -- scheme). No schema change needed — created_at already exists and is what the
 -- 14-day trial is measured from.

@@ -94,7 +94,7 @@ export async function sendSignedCopyEmail(opts: {
   const inner = `
     <div style="font-size:40px;line-height:1;color:${SEAL};margin:0 0 10px">✓</div>
     <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Signed and sealed</h1>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#45514b">Hi ${escape(name.split(" ")[0])}, your certified copy of <strong>${escape(filename)}</strong> is ready${isSender ? " — everyone has signed" : ""}. The certificate of completion is included in the PDF.</p>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#45514b">Hi ${escape(name.split(" ")[0])}, your signed copy of <strong>${escape(filename)}</strong> is ready${isSender ? " — everyone has signed" : ""}. It's the original document with the signatures added, nothing else.</p>
     <p style="margin:0 0 8px">${button("Download signed copy", downloadUrl)}</p>
     <p style="margin:18px 0 0;font-size:12px;color:#8a978f">This download link is valid for 7 days.</p>`;
   return send(to, `Signed: ${filename}`, shell(inner));

@@ -28,11 +28,18 @@ export interface StampInput {
   requestId: string;
   sha256: string;
   events: { event_type: string; created_at: string; meta: Record<string, unknown> }[];
+  /**
+   * When true, append a full certificate page (signers + event trail + eIDAS
+   * note). Default false: the delivered file is the original document exactly
+   * as sent, with only the signature(s) added where they were signed.
+   */
+  appendCertificate?: boolean;
 }
 
 /**
- * Stamps every signature onto the last content page (stacked), then appends
- * a certificate page listing all signers and the full event trail.
+ * Stamps every signature onto the document (at placed positions, or stacked at
+ * the foot of the last page). By default the file is returned unchanged apart
+ * from the signatures; pass appendCertificate to add a certificate page.
  */
 export async function stampAndCertify(input: StampInput): Promise<Uint8Array> {
   const doc = await PDFDocument.load(input.originalPdf);
@@ -91,6 +98,12 @@ export async function stampAndCertify(input: StampInput): Promise<Uint8Array> {
       col++;
       if (col >= 3) col = 0;
     }
+  }
+
+  // The default output is the original document plus the signatures — nothing
+  // else is added. The certificate page is opt-in.
+  if (!input.appendCertificate) {
+    return doc.save();
   }
 
   // Certificate page

@@ -9,7 +9,7 @@ const SCRIPT: { who: "them" | "bot"; kind: "text" | "doc" | "signed"; text?: str
   { who: "bot", kind: "text", text: "Got it. Who's signing?" },
   { who: "them", kind: "text", text: "James Carter" },
   { who: "bot", kind: "text", text: "Here's the link to send James 👇" },
-  { who: "bot", kind: "signed", label: "tenancy-agreement · signed.pdf", note: "Signed. Certificate attached." },
+  { who: "bot", kind: "signed", label: "tenancy-agreement · signed.pdf", note: "Signed and sent back to everyone." },
 ];
 
 export default function LandingChat() {
