@@ -202,6 +202,151 @@ export const POSTS: Post[] = [
 `,
     related: ["is-electronic-signature-legal-in-nigeria", "what-is-an-electronic-signature"],
   },
+
+  // ------------------------------------------------------------------ 4
+  {
+    slug: "electronic-signature-vs-digital-signature",
+    title: "Electronic Signature vs Digital Signature: What's the Difference?",
+    description:
+      "They sound identical but they're not. Here's the difference between an electronic signature and a digital signature, in plain English — and which one you actually need.",
+    keyword: "electronic signature vs digital signature",
+    date: "2026-11-17",
+    readingMins: 4,
+    excerpt:
+      "They sound identical but they're not the same thing. Here's the difference in plain English — and which one you actually need for a contract.",
+    bodyHtml: `
+<p>"Electronic signature" and "digital signature" get used as if they mean the same thing. They're related, but they're not identical — and the difference matters when you're deciding how to sign something important.</p>
+
+<h2>The short version</h2>
+<ul>
+<li>An <strong>electronic signature</strong> is the broad concept: any electronic way of showing you agreed to a document — a drawn signature, a typed name, a click.</li>
+<li>A <strong>digital signature</strong> is a specific technology used to secure a signature, using cryptography (public-key / PKI) to bind the signature to the document and make tampering detectable.</li>
+</ul>
+<p>So a digital signature is <em>one kind</em> of electronic signature — the most technically secure kind — but most electronic signatures you'll ever make aren't "digital signatures" in that strict sense. And that's fine.</p>
+
+<h2>A side-by-side look</h2>
+<ul>
+<li><strong>What it is</strong> — E-signature: a legal/consent concept. Digital signature: a cryptographic method.</li>
+<li><strong>How it proves identity</strong> — E-signature: email, phone, device, timestamp, audit trail. Digital signature: a certificate issued by a certificate authority.</li>
+<li><strong>Tamper evidence</strong> — E-signature: via the audit trail and a sealed copy. Digital signature: built into the cryptography.</li>
+<li><strong>Typical use</strong> — E-signature: everyday contracts, NDAs, tenancy agreements, forms. Digital signature: high-security or regulated settings — some government filings, certain financial documents.</li>
+</ul>
+
+<h2>Which one do you actually need?</h2>
+<p>For almost all business — a freelance contract, a tenancy agreement, an NDA, a service agreement, an offer letter — a well-made electronic signature with a proper audit trail is enough, and it's legally recognised. You only need a formal digital-signature (PKI) setup when a specific law, regulator, or counterparty demands that exact standard.</p>
+<p>The thing that actually protects you in a dispute isn't whether the signature was "digital" — it's whether you can show <strong>who signed, when, and that the document wasn't changed afterward</strong>. A good e-signature tool records all three.</p>
+
+<h2>What about the law?</h2>
+<p>Electronic signatures are legally recognised in Nigeria and most countries. For the Nigeria-specific detail, see <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a> If you're still fuzzy on the basics, start with <a href="/blog/what-is-an-electronic-signature">What is an electronic signature?</a></p>
+
+<p>When you're ready to sign something, <a href="/app">Inkline</a> gives you a legally recognised electronic signature with the full record kept for you — no app, no account.</p>
+`,
+    related: ["what-is-an-electronic-signature", "is-electronic-signature-legal-in-nigeria"],
+  },
+
+  // ------------------------------------------------------------------ 5
+  {
+    slug: "how-to-sign-a-tenancy-agreement-in-nigeria",
+    title: "How to Sign a Tenancy Agreement in Nigeria (Online, Step by Step)",
+    description:
+      "A practical guide to signing a tenancy agreement in Nigeria — what the agreement must contain, whether you can sign online, stamping and registration, and the exact steps.",
+    keyword: "how to sign tenancy agreement nigeria",
+    date: "2026-11-17",
+    readingMins: 6,
+    excerpt:
+      "What a Nigerian tenancy agreement must contain, whether you can sign it online (you can), stamping and registration, and the exact steps to get it signed.",
+    bodyHtml: `
+<p>A tenancy agreement is one of the most common documents Nigerians sign — and one of the most common to get signed badly, with missing details or no proper record. Here's how to do it right, including whether you can skip the printing and sign online (you can).</p>
+
+<h2>What a tenancy agreement should contain</h2>
+<p>Before signing anything, check the agreement clearly states:</p>
+<ul>
+<li><strong>The parties</strong> — full names and addresses of the landlord and tenant.</li>
+<li><strong>The property</strong> — a clear description of what's being let.</li>
+<li><strong>The term</strong> — start date and length (e.g. one year), and renewal terms.</li>
+<li><strong>The rent</strong> — amount, how often, and how it's paid.</li>
+<li><strong>Other sums</strong> — caution/security deposit, service charge, agency/legal fees.</li>
+<li><strong>Obligations</strong> — repairs, use of the property, subletting, notice periods.</li>
+<li><strong>Signatures and witnesses</strong> — both parties sign; a witness for each side is good practice.</li>
+</ul>
+
+<h2>Can you sign a tenancy agreement electronically in Nigeria?</h2>
+<p>Yes. A tenancy agreement is an ordinary contract, and electronic signatures are recognised in Nigeria under the Evidence Act 2011 and related laws. A tenancy agreement signed electronically — with a record of who signed and when — is valid and enforceable. (We cover the legal basis in full in <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a>)</p>
+<p>Two practical points that are easy to miss:</p>
+<ul>
+<li><strong>Stamping (stamp duty).</strong> Tenancy agreements attract stamp duty. Signing electronically doesn't remove this — stamp the agreement with the relevant authority so it's properly admissible and recognised.</li>
+<li><strong>Registration for longer leases.</strong> A short tenancy usually doesn't need registration, but longer leases (commonly those over three years) may need to be registered at the state land registry. Check your state's rules.</li>
+</ul>
+
+<h2>Step by step: get it signed online</h2>
+<ol>
+<li><strong>Finalise the wording</strong> — make sure everything in the checklist above is filled in and both sides have read it.</li>
+<li><strong>Save it as a PDF.</strong></li>
+<li><strong>Send it for signing.</strong> Go to <a href="/app">inklinesign.com/app</a>, upload the PDF, and add the other party (landlord or tenant) by name, and email if you have it. Add a witness as an extra signer if you want one on the document.</li>
+<li><strong>They sign from their phone.</strong> The signer opens the link, taps the signature line on the page, and draws their signature. No app, no account.</li>
+<li><strong>Everyone gets the signed copy</strong> back automatically, with the signing details recorded.</li>
+<li><strong>Stamp it.</strong> Take the signed agreement for stamping (stamp duty), and register it if the lease length requires it.</li>
+</ol>
+
+<h2>Why keep a proper record</h2>
+<p>Tenancy disputes happen — over rent, deposits, repairs, or notice. The agreement is only as useful as your proof that it was agreed. A signed PDF with a record of who signed and when is far stronger than a loose scan. That record is exactly what a signing tool keeps for you.</p>
+
+<p style="font-size:14px;color:#6b7768"><em>This is general information, not legal advice. Tenancy rules and stamp-duty rates vary by state — confirm the specifics for your state, or ask a lawyer for a high-value lease.</em></p>
+`,
+    related: ["is-electronic-signature-legal-in-nigeria", "how-to-sign-a-pdf-online-free"],
+  },
+
+  // ------------------------------------------------------------------ 6
+  {
+    slug: "best-docusign-alternatives-nigeria",
+    title: "The Best DocuSign Alternatives in Nigeria (2026)",
+    description:
+      "DocuSign is powerful but priced for big teams in dollars. Here are the best e-signature alternatives for Nigerian businesses and individuals in 2026 — and how to choose.",
+    keyword: "docusign alternatives nigeria",
+    date: "2026-11-17",
+    readingMins: 6,
+    excerpt:
+      "DocuSign is powerful, but priced in dollars for big teams. Here are the best e-signature options for Nigerian businesses and individuals in 2026 — and how to pick.",
+    bodyHtml: `
+<p>DocuSign more or less invented mainstream e-signing, and it's a solid product. But for a lot of Nigerian businesses and individuals it's overkill: it's priced per user in US dollars, built for large teams and complex workflows, and it asks your signers to go through an account-style flow. If you just need to get a contract signed quickly and cheaply, there are better fits.</p>
+<p>Here's an honest look at the main options, who each suits, and how to choose.</p>
+
+<h2>The main options</h2>
+<h3>DocuSign</h3>
+<p>The enterprise standard. Deep features, integrations, and workflow controls. Best if you're a larger organisation that needs advanced routing, compliance tooling, and lots of integrations, and you're comfortable paying in USD per user. For a small business or a one-off agreement, it's more than you need.</p>
+
+<h3>Flowmono</h3>
+<p>A Nigerian platform that combines e-signatures with no-code workflow automation. A good fit if your main problem is automating multi-step internal processes (approvals, document routing) rather than simply getting something signed. If you want workflow automation as well as signatures, it's worth a look.</p>
+
+<h3>Zoho Sign / Signeasy</h3>
+<p>Established global tools with free or low-cost tiers and mobile apps. Reasonable middle-ground choices if you already live in a particular software ecosystem (for example, Zoho) or want a traditional app-based signing experience.</p>
+
+<h3>Inkline</h3>
+<p>Built for exactly the "just get it signed" case, with a Nigerian audience in mind:</p>
+<ul>
+<li><strong>Pays in naira</strong>, not dollars per user.</li>
+<li><strong>No app and no account for the signer</strong> — they open a link, tap where to sign, draw their signature, done in about 20 seconds.</li>
+<li><strong>Works on Telegram and the web</strong>, so you can send a document in the channel people already use.</li>
+<li><strong>Clean signed file</strong> — the finished PDF is your original with just the signature added where it belongs, plus a record of who signed and when.</li>
+<li><strong>Free for 14 days</strong>, no card needed.</li>
+</ul>
+<p>It's the lightest, fastest option if your goal is signatures rather than a whole document-automation suite.</p>
+
+<h2>How to choose</h2>
+<ul>
+<li><strong>Large team, complex approvals, USD budget</strong> → DocuSign.</li>
+<li><strong>Want workflow automation alongside signing</strong> → Flowmono.</li>
+<li><strong>Already in a specific software ecosystem</strong> → Zoho Sign or your suite's built-in tool.</li>
+<li><strong>Just need documents signed, fast, in naira, without making signers install anything</strong> → <a href="/app">Inkline</a>.</li>
+</ul>
+
+<h2>The one thing that matters either way</h2>
+<p>Whatever you pick, make sure it keeps a record of who signed and when, and leaves the document intact. That's what makes an electronic signature hold up — see <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a> for why the audit trail matters more than the signature image itself.</p>
+
+<p>Want to try the fast route? <a href="/app">Send your first document with Inkline →</a> — free for 14 days, no account for your signers.</p>
+`,
+    related: ["is-electronic-signature-legal-in-nigeria", "how-to-sign-a-pdf-online-free"],
+  },
 ];
 
 export function allPosts(): Post[] {
