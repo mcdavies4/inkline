@@ -722,3 +722,16 @@ textarea.field-input { resize: vertical; min-height: 56px; }
   font-weight: 600;
 }
 .copybtn:hover { opacity: 0.92; }
+
+/* Tap-to-sign: the signer's chosen signature spot on the page */
+.sign-spot {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--seal);
+  background: rgba(31, 122, 92, 0.08);
+  border-radius: 3px;
+  pointer-events: none;
+  overflow: hidden;
+}

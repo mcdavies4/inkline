@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import PlacementSign from "./PlacementSign";
+import TapToSign from "./TapToSign";
 import SignatureField from "./SignatureField";
 import TelegramSignFix from "./TelegramSignFix";
 
@@ -156,6 +157,26 @@ export default function SignPage() {
           setDownloadUrl(url);
           setDone(true);
         }}
+        onWaiting={() => setWaiting(true)}
+      />
+    );
+  }
+
+  // Default path: no sender-placed fields, but we have the PDF — let the signer
+  // tap where to sign so the signature lands on the document's own line and
+  // never covers existing content. (Falls back to a bottom pad inside TapToSign
+  // if the PDF can't render.)
+  if (!data.hasPlacement && data.pdfUrl && (!data.requireOtp || otpVerified)) {
+    return (
+      <TapToSign
+        token={token}
+        signerName={data.signerName}
+        senderName={data.senderName}
+        filename={data.filename}
+        pdfUrl={data.pdfUrl}
+        summary={data.summary}
+        message={data.message}
+        onDone={(url) => { setDownloadUrl(url); setDone(true); }}
         onWaiting={() => setWaiting(true)}
       />
     );

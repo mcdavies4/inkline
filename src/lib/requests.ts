@@ -349,7 +349,9 @@ export async function buildAndDeliverFinal(requestId: string, _unused?: string):
   let placedFields:
     | { type: "signature" | "date" | "initials" | "text"; page: number; x: number; y: number; w: number; h: number; value?: string | null; png?: Uint8Array | null }[]
     | undefined;
-  if (request.placement === "done") {
+  {
+    // Always read placed fields: sender placement (Telegram PLACE) OR a signer
+    // who tapped where to sign on the web both land here.
     const { data: fields } = await db.from("doc_fields").select("*").eq("request_id", requestId);
     placedFields = [];
     for (const f of fields ?? []) {

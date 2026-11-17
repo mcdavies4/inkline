@@ -49,7 +49,10 @@ export async function stampAndCertify(input: StampInput): Promise<Uint8Array> {
   const pages = doc.getPages();
   const last = pages[pages.length - 1];
 
-  // If the sender placed fields at exact positions, stamp those instead of stacking.
+  // Placed fields (sender-placed OR signer-tapped): stamp at exact positions.
+  // This and the bottom-stack below are independent — a signer who placed their
+  // signature is only in placedFields, one who used the bottom pad is only in
+  // `signatures`, so nothing is stamped twice and existing content is respected.
   if (input.placedFields && input.placedFields.length > 0) {
     for (const f of input.placedFields) {
       const page = pages[Math.min(f.page, pages.length - 1)];
@@ -76,8 +79,11 @@ export async function stampAndCertify(input: StampInput): Promise<Uint8Array> {
         page.drawText(f.value, { x: bx + 2, y: by + bh * 0.25, size, font: helv, color: INK });
       }
     }
-  } else {
-    // Legacy/skip path: stack signature blocks along the bottom of the last page.
+  }
+
+  // Bottom-stack: only for signatures captured WITHOUT a chosen position
+  // (the "sign at the bottom" fallback). Placed signatures never reach here.
+  if (input.signatures.length > 0) {
     const sigW = 150;
     const x = 48;
     const y = 70;

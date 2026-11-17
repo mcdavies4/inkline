@@ -211,6 +211,54 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ ok: true, status: "signed", signedPdfUrl: finalUrl });
   }
 
+  // ---- Tap-to-place branch: the signer chose where their signature goes ----
+  // Stored as a placed field so it stamps at that exact spot on the page,
+  // never covering the document's existing content.
+  if (body?.placedSignature) {
+    const p = body.placedSignature as { page?: number; x?: number; y?: number; w?: number; h?: number; png?: string };
+    if (!p.png?.startsWith("data:image/png;base64,")) {
+      return NextResponse.json({ error: "A signature is required." }, { status: 400 });
+    }
+    const bytes = Buffer.from(p.png.split(",")[1], "base64");
+    if (bytes.length > 500_000) {
+      return NextResponse.json({ error: "Signature image too large." }, { status: 400 });
+    }
+    const clamp = (n: unknown, lo: number, hi: number, d: number) => {
+      const v = typeof n === "number" ? n : Number(n);
+      return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
+    };
+    const page = Math.max(0, Math.min(50, Math.floor(clamp(p.page, 0, 50, 0))));
+    const x = clamp(p.x, 0, 0.98, 0.1);
+    const y = clamp(p.y, 0, 0.98, 0.85);
+    const w = clamp(p.w, 0.05, 1, 0.3);
+    const h = clamp(p.h, 0.02, 0.5, 0.08);
+
+    const { data: fieldRow, error: fErr } = await db
+      .from("doc_fields")
+      .insert({ request_id: request.id, signer_id: signer.id, type: "signature", page, x, y, w, h, fill_mode: "signer", filled_at: new Date().toISOString() })
+      .select()
+      .single();
+    if (fErr || !fieldRow) {
+      return NextResponse.json({ error: "Couldn't save your signature. Please try again." }, { status: 500 });
+    }
+    const fieldPath = `fieldimg/${fieldRow.id}.png`;
+    await db.storage.from(BUCKET).upload(fieldPath, bytes, { contentType: "image/png", upsert: true });
+    await db.from("doc_fields").update({ value_path: fieldPath }).eq("id", fieldRow.id);
+
+    await db.from("signers").update({ status: "signed", signed_at: new Date().toISOString(), ip, user_agent: ua }).eq("id", signer.id);
+    await db.from("audit_events").insert({
+      request_id: request.id,
+      signer_id: signer.id,
+      event_type: "signed",
+      meta: { ip, user_agent: ua, placed: true },
+    });
+
+    const { allDone } = await advanceAfterSignature(request.id);
+    if (!allDone) return NextResponse.json({ ok: true, status: "waiting_others" });
+    const finalUrl = await buildAndDeliverFinal(request.id, params.token);
+    return NextResponse.json({ ok: true, status: "signed", signedPdfUrl: finalUrl });
+  }
+
   const dataUrl: string | undefined = body?.signaturePng;
   if (!dataUrl?.startsWith("data:image/png;base64,")) {
     return NextResponse.json({ error: "A signature is required." }, { status: 400 });
