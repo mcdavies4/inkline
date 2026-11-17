@@ -80,32 +80,40 @@ export async function createRequestPending(input: CreateRequestInput): Promise<s
     /* summary optional */
   }
 
+  // Only reference the web-only columns (sender_email / signers.email) when a
+  // value is actually present. This keeps the Telegram path working on a DB that
+  // hasn't yet run migration 0009 — it never names those columns.
+  const reqInsert: Record<string, unknown> = {
+    document_id: doc.id,
+    sender_name: input.senderName,
+    sender_phone: input.senderPhone ?? null,
+    message: input.message ?? null,
+    mode,
+    signing_flow: flow,
+    require_otp: input.requireOtp ?? false,
+    ai_summary: aiSummary,
+    status: "pending",
+  };
+  if (input.senderEmail) reqInsert.sender_email = input.senderEmail;
+
   const { data: request, error: reqErr } = await db
     .from("sign_requests")
-    .insert({
-      document_id: doc.id,
-      sender_name: input.senderName,
-      sender_phone: input.senderPhone ?? null,
-      sender_email: input.senderEmail ?? null,
-      message: input.message ?? null,
-      mode,
-      signing_flow: flow,
-      require_otp: input.requireOtp ?? false,
-      ai_summary: aiSummary,
-      status: "pending",
-    })
+    .insert(reqInsert)
     .select()
     .single();
   if (reqErr) throw new Error(reqErr.message);
 
-  const signerRows = input.signers.map((s, i) => ({
-    request_id: request.id,
-    phone_e164: s.phone,
-    name: s.name,
-    email: s.email ?? null,
-    sign_token: randomBytes(24).toString("base64url"),
-    sign_order: i + 1,
-  }));
+  const signerRows = input.signers.map((s, i) => {
+    const row: Record<string, unknown> = {
+      request_id: request.id,
+      phone_e164: s.phone,
+      name: s.name,
+      sign_token: randomBytes(24).toString("base64url"),
+      sign_order: i + 1,
+    };
+    if (s.email) row.email = s.email;
+    return row;
+  });
   const { error: sErr } = await db.from("signers").insert(signerRows).select();
   if (sErr) throw new Error(sErr.message);
 
