@@ -11,6 +11,15 @@ export const maxDuration = 60;
 const BASE = process.env.APP_BASE_URL ?? "https://www.inklinesign.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Founder/comped emails (comma-separated in FOUNDER_EMAILS) get unlimited web access. */
+function isFounderEmail(email: string): boolean {
+  return (process.env.FOUNDER_EMAILS ?? "")
+    .split(/[,\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.toLowerCase());
+}
+
 /**
  * POST /api/web/send  (multipart/form-data)
  *
@@ -89,7 +98,7 @@ export async function POST(req: NextRequest) {
     console.error("WEB SEND: getAccount failed —", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
-  const allowed = account.plan === "active" || withinTrial(account.created_at);
+  const allowed = isFounderEmail(senderEmail) || account.plan === "active" || withinTrial(account.created_at);
   if (!allowed) {
     const options = await checkoutOptionsForEmail(senderEmail);
     return NextResponse.json(
