@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import SignatureField from "./SignatureField";
 import TelegramSignFix from "./TelegramSignFix";
 
@@ -23,7 +23,8 @@ export default function TapToSign(props: Props) {
   const [pages, setPages] = useState<{ dataUrl: string; ratio: number }[]>([]);
   const [rendering, setRendering] = useState(true);
   const [renderFailed, setRenderFailed] = useState(false);
-  const [spot, setSpot] = useState<{ page: number; x: number; y: number } | null>(null);
+  const [spot, setSpot] = useState<{ page: number; x: number; y: number; w: number; h: number } | null>(null);
+  const dragRef = useRef<{ kind: "move" | "resize"; startX: number; startY: number; rect: DOMRect; base: { x: number; y: number; w: number; h: number } } | null>(null);
   const [signaturePng, setSignaturePng] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -74,11 +75,44 @@ export default function TapToSign(props: Props) {
     const rect = e.currentTarget.getBoundingClientRect();
     const cx = (e.clientX - rect.left) / rect.width;
     const cy = (e.clientY - rect.top) / rect.height;
-    const x = Math.max(0, Math.min(1 - BOX_W, cx - BOX_W / 2));
-    const y = Math.max(0, Math.min(1 - BOX_H, cy - BOX_H / 2));
-    setSpot({ page: idx, x, y });
+    const w = spot?.w ?? BOX_W;
+    const h = spot?.h ?? BOX_H;
+    const x = Math.max(0, Math.min(1 - w, cx - w / 2));
+    const y = Math.max(0, Math.min(1 - h, cy - h / 2));
+    setSpot({ page: idx, x, y, w, h });
     // Bring the signature pad into view so they can draw next.
     setTimeout(() => padRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  };
+
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+  const onDragMove = (e: PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = (e.clientX - d.startX) / d.rect.width;
+    const dy = (e.clientY - d.startY) / d.rect.height;
+    setSpot((prev) => {
+      if (!prev) return prev;
+      if (d.kind === "move") {
+        return { ...prev, x: clamp(d.base.x + dx, 0, 1 - prev.w), y: clamp(d.base.y + dy, 0, 1 - prev.h) };
+      }
+      return { ...prev, w: clamp(d.base.w + dx, 0.08, 1 - prev.x), h: clamp(d.base.h + dy, 0.03, 1 - prev.y) };
+    });
+  };
+  const onDragEnd = () => {
+    dragRef.current = null;
+    window.removeEventListener("pointermove", onDragMove);
+    window.removeEventListener("pointerup", onDragEnd);
+  };
+  const startDrag = (kind: "move" | "resize", e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!spot) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const pageEl = (e.currentTarget as HTMLElement).closest(".place-page");
+    if (!pageEl) return;
+    dragRef.current = { kind, startX: e.clientX, startY: e.clientY, rect: pageEl.getBoundingClientRect(), base: { x: spot.x, y: spot.y, w: spot.w, h: spot.h } };
+    window.addEventListener("pointermove", onDragMove);
+    window.addEventListener("pointerup", onDragEnd);
   };
 
   const canSubmit =
@@ -91,7 +125,7 @@ export default function TapToSign(props: Props) {
     try {
       const payload =
         mode === "place" && spot
-          ? { placedSignature: { page: spot.page, x: spot.x, y: spot.y, w: BOX_W, h: BOX_H, png: signaturePng } }
+          ? { placedSignature: { page: spot.page, x: spot.x, y: spot.y, w: spot.w, h: spot.h, png: signaturePng } }
           : { signaturePng };
       const r = await fetch(`/api/sign/${props.token}`, {
         method: "POST",
@@ -148,14 +182,16 @@ export default function TapToSign(props: Props) {
               {spot && spot.page === idx && (
                 <div
                   className="sign-spot"
-                  style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, width: `${BOX_W * 100}%`, height: `${BOX_H * 100}%` }}
+                  style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, width: `${spot.w * 100}%`, height: `${spot.h * 100}%` }}
+                  onPointerDown={(e) => startDrag("move", e)}
                 >
                   {signaturePng ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={signaturePng} alt="" style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                    <img src={signaturePng} alt="" style={{ maxWidth: "100%", maxHeight: "100%", pointerEvents: "none" }} />
                   ) : (
-                    <span className="fill-label">Sign here</span>
+                    <span className="fill-label">Sign here · drag to move</span>
                   )}
+                  <div className="sign-spot-handle" onPointerDown={(e) => startDrag("resize", e)} />
                 </div>
               )}
             </div>
