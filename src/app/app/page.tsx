@@ -13,9 +13,17 @@ type Draft = {
   signers: { name?: string; email?: string }[];
   updatedAt: string;
 };
+type SentDoc = {
+  id: string;
+  filename: string;
+  status: string;
+  createdAt: string;
+  pendingWithEmail: number;
+  signers: { name: string; email: string | null; status: string; signUrl: string }[];
+};
 
 export default function WebSendPage() {
-  const [view, setView] = useState<"compose" | "drafts">("compose");
+  const [view, setView] = useState<"compose" | "drafts" | "sent">("compose");
 
   // Compose state
   const [senderName, setSenderName] = useState("");
@@ -39,6 +47,13 @@ export default function WebSendPage() {
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+
+  // Sent state
+  const [sentDocs, setSentDocs] = useState<SentDoc[] | null>(null);
+  const [loadingSent, setLoadingSent] = useState(false);
+  const [sentError, setSentError] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+  const [resendMsg, setResendMsg] = useState<{ id: string; text: string } | null>(null);
 
   const setSigner = (i: number, patch: Partial<Signer>) =>
     setSigners((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -187,6 +202,40 @@ export default function WebSendPage() {
     if (draftId === d.id) resetCompose();
   };
 
+  // ---- Sent documents + resend ----
+  const loadSent = async () => {
+    if (!senderEmail.trim()) { setSentError("Enter your email to see your sent documents."); return; }
+    setLoadingSent(true); setSentError(null); setResendMsg(null);
+    try {
+      const r = await fetch(`/api/web/sent?email=${encodeURIComponent(senderEmail.trim().toLowerCase())}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Couldn't load your documents.");
+      setSentDocs(j.documents ?? []);
+    } catch (e) {
+      setSentError(e instanceof Error ? e.message : "Couldn't load your documents.");
+    } finally {
+      setLoadingSent(false);
+    }
+  };
+
+  const resendInvites = async (d: SentDoc) => {
+    setResending(d.id); setResendMsg(null);
+    try {
+      const r = await fetch(`/api/web/sent/${d.id}/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: senderEmail.trim().toLowerCase() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Couldn't resend.");
+      setResendMsg({ id: d.id, text: j.sent > 0 ? `Resent to ${j.sent} signer${j.sent === 1 ? "" : "s"} ✓` : (j.note ?? "Nothing to resend.") });
+    } catch (e) {
+      setResendMsg({ id: d.id, text: e instanceof Error ? e.message : "Couldn't resend." });
+    } finally {
+      setResending(null);
+    }
+  };
+
   // ============ Trial-ended / subscribe ============
   if (checkout) {
     return (
@@ -280,6 +329,60 @@ export default function WebSendPage() {
     );
   }
 
+  // ============ Sent view ============
+  if (view === "sent") {
+    return (
+      <main className="wrap">
+        <header className="brand">Inkline</header>
+        <Tabs view={view} setView={setView} />
+        <div className="card">
+          <p className="eyebrow">Your sent documents</p>
+          <div className="field">
+            <label>Your email</label>
+            <input className="field-input" type="email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="you@company.com" />
+          </div>
+          <button className="primary" onClick={loadSent} disabled={loadingSent}>
+            {loadingSent ? "Loading…" : "Show my sent documents"}
+          </button>
+          {sentError && <p className="err">{sentError}</p>}
+        </div>
+
+        {sentDocs && sentDocs.length === 0 && (
+          <div className="card center"><p className="mute">Nothing sent yet.</p></div>
+        )}
+        {(sentDocs ?? []).map((d, di) => (
+          <div className="card" key={d.id}>
+            <p className="eyebrow">{d.filename}</p>
+            <p className="mute" style={{ fontSize: 13, margin: "0 0 10px" }}>
+              Sent {new Date(d.createdAt).toLocaleString()} · {d.status === "signed" ? "fully signed ✓" : `${d.pendingWithEmail} awaiting signature`}
+            </p>
+            {d.signers.map((s, si) => (
+              <div key={si} style={{ marginBottom: 10 }}>
+                <p className="mute" style={{ fontSize: 13, margin: "0 0 4px" }}>
+                  <strong style={{ color: "var(--ink)" }}>{s.name}</strong>
+                  {s.status === "signed" ? " · signed ✓" : s.email ? ` · ${s.email}` : " · link only"}
+                </p>
+                {s.status !== "signed" && (
+                  <div className="linkrow">
+                    <input className="field-input mono" readOnly value={s.signUrl} onFocus={(e) => e.currentTarget.select()} />
+                    <button className="copybtn" onClick={() => copy(s.signUrl, di * 100 + si)}>{copied === di * 100 + si ? "Copied" : "Copy"}</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+              <button className="copybtn" onClick={() => resendInvites(d)} disabled={resending === d.id || d.pendingWithEmail === 0}>
+                {resending === d.id ? "Sending…" : "Resend email invites"}
+              </button>
+              {resendMsg && resendMsg.id === d.id && <span className="mute" style={{ fontSize: 13, color: "var(--seal)" }}>{resendMsg.text}</span>}
+            </div>
+          </div>
+        ))}
+        <footer className="foot"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></footer>
+      </main>
+    );
+  }
+
   // ============ Compose view ============
   return (
     <main className="wrap">
@@ -363,10 +466,11 @@ export default function WebSendPage() {
   );
 }
 
-function Tabs({ view, setView }: { view: "compose" | "drafts"; setView: (v: "compose" | "drafts") => void }) {
+function Tabs({ view, setView }: { view: "compose" | "drafts" | "sent"; setView: (v: "compose" | "drafts" | "sent") => void }) {
   return (
     <div className="app-tabs">
       <button className={view === "compose" ? "active" : ""} onClick={() => setView("compose")}>New</button>
+      <button className={view === "sent" ? "active" : ""} onClick={() => setView("sent")}>Sent</button>
       <button className={view === "drafts" ? "active" : ""} onClick={() => setView("drafts")}>Drafts</button>
     </div>
   );
