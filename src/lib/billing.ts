@@ -13,12 +13,12 @@ export interface Account {
 }
 
 /**
- * Billing model: a 14-day free trial from the account's first use, then a
+ * Billing model: a 7-day free trial from the account's first use, then a
  * subscription. The trial is measured from accounts.created_at (set the first
  * time a sender touches the product on either Telegram or the web), so there's
  * no separate trial column to manage.
  */
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 7;
 
 export function withinTrial(createdAt: string | null | undefined): boolean {
   if (!createdAt) return true; // brand-new / unknown → treat as in-trial

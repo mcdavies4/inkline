@@ -126,7 +126,7 @@ export default function SignPage() {
           <a className="primary" style={{ display: "inline-block", textDecoration: "none" }} href="/app" rel="noreferrer">
             Try Inkline free →
           </a>
-          <p className="summary-fine" style={{ marginTop: 10 }}>Free for 14 days. No card needed.</p>
+          <p className="summary-fine" style={{ marginTop: 10 }}>Free for 7 days. No card needed.</p>
         </div>
       </main>
     );

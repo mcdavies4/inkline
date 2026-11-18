@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!gate.allowed) {
     const options = await checkoutOptionsForEmail(senderEmail);
     return NextResponse.json(
-      { error: "Your 14-day free trial has ended.", needsSubscription: true, options },
+      { error: "Your 7-day free trial has ended.", needsSubscription: true, options },
       { status: 402 }
     );
   }

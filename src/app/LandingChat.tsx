@@ -52,7 +52,7 @@ export default function LandingChat() {
               <Plane /> Telegram bot
             </a>
           </div>
-          <span className="cta-note">Free for 14 days · no card needed</span>
+          <span className="cta-note">Free for 7 days · no card needed</span>
         </div>
 
         <div className="hero-r">
@@ -136,7 +136,7 @@ export default function LandingChat() {
         <div className="cards">
           <div className="card">
             <div className="c-k">Free trial</div>
-            <div className="c-v">14 <span>days</span></div>
+            <div className="c-v">7 <span>days</span></div>
             <p>Everything included. No card needed to start.</p>
           </div>
           <div className="card pro">

@@ -98,7 +98,7 @@ export default function Article({ params }: { params: { slug: string } }) {
 
         <aside className="article-cta">
           <h3>Get a document signed in about 20 seconds</h3>
-          <p>No app, no account. Send a PDF, the other person signs from their phone, everyone gets the copy. Free for 14 days.</p>
+          <p>No app, no account. Send a PDF, the other person signs from their phone, everyone gets the copy. Free for 7 days.</p>
           <Link className="primary" href="/app" style={{ display: "inline-block", textDecoration: "none" }}>Send a PDF for signing →</Link>
         </aside>
 

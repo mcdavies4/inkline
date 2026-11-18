@@ -402,7 +402,7 @@ export async function buildAndDeliverFinal(requestId: string, _unused?: string):
         if (chatId !== request.sender_chat_id) {
           await sendCtaLink(
             chatId,
-            "Need something signed yourself? Start free — 14 days, no card needed.",
+            "Need something signed yourself? Start free — 7 days, no card needed.",
             "Try Inkline free",
             `https://t.me/${BOT}?start=src_signer`
           ).catch(() => {});

@@ -23,7 +23,7 @@ export function isFounderEmail(email: string): boolean {
     .includes(email.toLowerCase());
 }
 
-/** Account gate: founder, active plan, or still inside the 14-day trial. */
+/** Account gate: founder, active plan, or still inside the 7-day trial. */
 export async function webSendAllowed(email: string): Promise<{ allowed: boolean; account: Account }> {
   const account = await getAccount(`web:${email.toLowerCase()}`);
   const allowed = isFounderEmail(email) || account.plan === "active" || withinTrial(account.created_at);

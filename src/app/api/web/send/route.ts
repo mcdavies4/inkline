@@ -14,7 +14,7 @@ export const maxDuration = 60;
  * request, email any signer who gave an email their signing link, and return a
  * shareable link per signer for the ones who didn't (or as a fallback).
  *
- * Billing: a 14-day free trial from the sender's first send, then a Paystack
+ * Billing: a 7-day free trial from the sender's first send, then a Paystack
  * subscription. Founder emails skip the gate entirely.
  */
 export async function POST(req: NextRequest) {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (file.size > 20 * 1024 * 1024)
     return NextResponse.json({ error: "That PDF is over 20MB — please upload a smaller file." }, { status: 400 });
 
-  // ---- Billing gate: founder, active plan, or still within the 14-day trial ----
+  // ---- Billing gate: founder, active plan, or still within the 7-day trial ----
   let gate;
   try {
     gate = await webSendAllowed(senderEmail);
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   if (!gate.allowed) {
     const options = await checkoutOptionsForEmail(senderEmail);
     return NextResponse.json(
-      { error: "Your 14-day free trial has ended.", needsSubscription: true, options },
+      { error: "Your 7-day free trial has ended.", needsSubscription: true, options },
       { status: 402 }
     );
   }

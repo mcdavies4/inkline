@@ -457,7 +457,7 @@ export default function WebSendPage() {
         {savingDraft ? "Saving…" : draftId ? "Update draft" : "Save as draft"}
       </button>
 
-      <p className="field-hint" style={{ textAlign: "center" }}>Free for 14 days · no card needed</p>
+      <p className="field-hint" style={{ textAlign: "center" }}>Free for 7 days · no card needed</p>
       <footer className="foot">
         Prefer Telegram? <a href="https://t.me/InklineSignbot?start=web" target="_blank" rel="noreferrer">Use the bot ↗</a><br />
         <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>

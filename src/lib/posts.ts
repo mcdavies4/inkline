@@ -198,7 +198,7 @@ export const POSTS: Post[] = [
 <p>For most documents, yes. Electronic signatures are legally recognised in Nigeria and most countries. The key is using a tool that records who signed and when. We cover the Nigerian rules in detail here: <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a></p>
 
 <h2>Free to start</h2>
-<p>Inkline is free for 14 days with no card required, so you can send your first documents straight away. <a href="/app">Send a PDF for signing →</a></p>
+<p>Inkline is free for 7 days with no card required, so you can send your first documents straight away. <a href="/app">Send a PDF for signing →</a></p>
 `,
     related: ["is-electronic-signature-legal-in-nigeria", "what-is-an-electronic-signature"],
   },
@@ -328,7 +328,7 @@ export const POSTS: Post[] = [
 <li><strong>No app and no account for the signer</strong> — they open a link, tap where to sign, draw their signature, done in about 20 seconds.</li>
 <li><strong>Works on Telegram and the web</strong>, so you can send a document in the channel people already use.</li>
 <li><strong>Clean signed file</strong> — the finished PDF is your original with just the signature added where it belongs, plus a record of who signed and when.</li>
-<li><strong>Free for 14 days</strong>, no card needed.</li>
+<li><strong>Free for 7 days</strong>, no card needed.</li>
 </ul>
 <p>It's the lightest, fastest option if your goal is signatures rather than a whole document-automation suite.</p>
 
@@ -343,7 +343,7 @@ export const POSTS: Post[] = [
 <h2>The one thing that matters either way</h2>
 <p>Whatever you pick, make sure it keeps a record of who signed and when, and leaves the document intact. That's what makes an electronic signature hold up — see <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a> for why the audit trail matters more than the signature image itself.</p>
 
-<p>Want to try the fast route? <a href="/app">Send your first document with Inkline →</a> — free for 14 days, no account for your signers.</p>
+<p>Want to try the fast route? <a href="/app">Send your first document with Inkline →</a> — free for 7 days, no account for your signers.</p>
 `,
     related: ["is-electronic-signature-legal-in-nigeria", "how-to-sign-a-pdf-online-free"],
   },
