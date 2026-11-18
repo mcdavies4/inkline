@@ -62,6 +62,8 @@ export default function WebSendPage() {
   const [sentError, setSentError] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [resendMsg, setResendMsg] = useState<{ key: string; text: string } | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editVal, setEditVal] = useState("");
 
   const setSigner = (i: number, patch: Partial<Signer>) =>
     setSigners((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -226,22 +228,36 @@ export default function WebSendPage() {
     }
   };
 
-  // Remind all pending signers (no token) or one specific signer (token).
-  const remind = async (d: SentDoc, token?: string) => {
+  // Remind all pending signers (no token), one signer (token), optionally
+  // correcting that signer's email first (newEmail, with token).
+  const remind = async (d: SentDoc, token?: string, newEmail?: string) => {
     const key = token ? `${d.id}:${token}` : d.id;
     setResending(key); setResendMsg(null);
     try {
       const r = await fetch(`/api/web/sent/${d.id}/resend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: senderEmail.trim().toLowerCase(), ...(token ? { token } : {}) }),
+        body: JSON.stringify({
+          email: senderEmail.trim().toLowerCase(),
+          ...(token ? { token } : {}),
+          ...(newEmail ? { newEmail } : {}),
+        }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Couldn't send the reminder.");
+      // Reflect a corrected email in the list and close the editor.
+      if (token && newEmail) {
+        setSentDocs((prev) => (prev ?? []).map((doc) => {
+          if (doc.id !== d.id) return doc;
+          const signers = doc.signers.map((s) => (s.token === token ? { ...s, email: newEmail } : s));
+          return { ...doc, signers, pendingWithEmail: signers.filter((s) => s.email && s.status !== "signed").length };
+        }));
+        setEditingKey(null);
+      }
       setResendMsg({
         key,
         text: j.sent > 0
-          ? (token ? "Reminder sent ✓" : `Reminded ${j.sent} signer${j.sent === 1 ? "" : "s"} ✓`)
+          ? (token ? (newEmail ? "Email updated & reminder sent ✓" : "Reminder sent ✓") : `Reminded ${j.sent} signer${j.sent === 1 ? "" : "s"} ✓`)
           : (j.note ?? "Nothing to remind."),
       });
     } catch (e) {
@@ -384,25 +400,53 @@ export default function WebSendPage() {
               {d.signers.map((s, si) => {
                 const done = s.status === "signed";
                 const rkey = `${d.id}:${s.token}`;
+                const editing = editingKey === rkey;
                 return (
                   <div key={si} className="sig-track">
                     <div className="sig-track-head">
                       <span className={`sig-pill ${done ? "ok" : "wait"}`}>{done ? "Signed" : "Awaiting"}</span>
                       <div className="sig-track-who">
                         <strong>{s.name}</strong>
-                        <span>{done ? (s.signedAt ? `signed ${new Date(s.signedAt).toLocaleDateString()}` : "signed") : (s.email || "link only — no email")}</span>
+                        {editing ? (
+                          <input
+                            className="field-input"
+                            style={{ marginTop: 5, fontSize: 13, padding: "8px 10px" }}
+                            type="email"
+                            value={editVal}
+                            onChange={(e) => setEditVal(e.target.value)}
+                            placeholder="correct@email.com"
+                            autoFocus
+                          />
+                        ) : (
+                          <span>{done ? (s.signedAt ? `signed ${new Date(s.signedAt).toLocaleDateString()}` : "signed") : (s.email || "link only — no email")}</span>
+                        )}
                       </div>
-                      {!done && s.email && (
+                      {!done && !editing && s.email && (
                         <button className="copybtn ghost-btn" onClick={() => remind(d, s.token)} disabled={resending === rkey}>
                           {resending === rkey ? "…" : "Remind"}
                         </button>
                       )}
                     </div>
-                    {!done && (
-                      <div className="linkrow" style={{ marginTop: 6 }}>
-                        <input className="field-input mono" readOnly value={s.signUrl} onFocus={(e) => e.currentTarget.select()} />
-                        <button className="copybtn" onClick={() => copy(s.signUrl, di * 100 + si)}>{copied === di * 100 + si ? "Copied" : "Copy"}</button>
+
+                    {!done && editing && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button className="copybtn" onClick={() => remind(d, s.token, editVal.trim().toLowerCase())} disabled={resending === rkey || !editVal.trim()}>
+                          {resending === rkey ? "Saving…" : "Save & resend"}
+                        </button>
+                        <button className="copybtn ghost-btn" onClick={() => setEditingKey(null)}>Cancel</button>
                       </div>
+                    )}
+
+                    {!done && !editing && (
+                      <>
+                        <button className="editlink" onClick={() => { setEditingKey(rkey); setEditVal(s.email || ""); setResendMsg(null); }}>
+                          {s.email ? "Wrong email? Edit & resend" : "Add an email to send it"}
+                        </button>
+                        <div className="linkrow" style={{ marginTop: 6 }}>
+                          <input className="field-input mono" readOnly value={s.signUrl} onFocus={(e) => e.currentTarget.select()} />
+                          <button className="copybtn" onClick={() => copy(s.signUrl, di * 100 + si)}>{copied === di * 100 + si ? "Copied" : "Copy"}</button>
+                        </div>
+                      </>
                     )}
                     {resendMsg && resendMsg.key === rkey && <p className="mute" style={{ fontSize: 12, color: "var(--seal)", margin: "5px 0 0" }}>{resendMsg.text}</p>}
                   </div>

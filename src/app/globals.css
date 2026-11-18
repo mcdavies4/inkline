@@ -896,3 +896,18 @@ textarea.field-input { resize: vertical; min-height: 56px; }
 .sig-pill.ok { background: rgba(31, 122, 92, 0.14); color: var(--seal); }
 .sig-pill.wait { background: rgba(176, 124, 0, 0.14); color: #a97b00; }
 .copybtn.ghost-btn { background: transparent; color: var(--seal); border: 1px solid var(--seal); }
+
+/* Sent tracker: edit-email link */
+.editlink {
+  display: inline-block;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--seal);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
