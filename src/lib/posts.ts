@@ -347,6 +347,67 @@ export const POSTS: Post[] = [
 `,
     related: ["is-electronic-signature-legal-in-nigeria", "how-to-sign-a-pdf-online-free"],
   },
+
+  // ------------------------------------------------------------------ 7
+  {
+    slug: "how-to-sign-a-pdf-on-your-phone",
+    title: "How to Sign a PDF on Your Phone (iPhone & Android), Free",
+    description:
+      "Sign a PDF on your phone in under a minute — no printer, no scanner. Step-by-step for iPhone and Android, plus the easy way to get someone else to sign.",
+    keyword: "how to sign a pdf on your phone",
+    date: "2026-11-18",
+    readingMins: 6,
+    excerpt:
+      "No printer, no scanner. Here's how to sign a PDF on iPhone and Android in under a minute — and the easier way when you need someone else to sign.",
+    bodyHtml: `
+<p>You don't need a printer, a scanner, or a laptop to sign a PDF. Your phone can do it in under a minute — and if you need <em>someone else</em> to sign, there's an even simpler way that works on any phone with no app at all. Here's all of it.</p>
+
+<h2>Sign a PDF on iPhone or iPad</h2>
+<p>iPhones have signing built in through the <strong>Markup</strong> tool — no app to download.</p>
+<ol>
+<li>Open the PDF (from Files, Mail, or Messages) and tap it to preview.</li>
+<li>Tap the <strong>Markup</strong> icon — the pen tip in a circle.</li>
+<li>Tap the <strong>+</strong> button, then <strong>Signature</strong>.</li>
+<li>Draw your signature with your finger (or pick one you saved before), then tap Done.</li>
+<li>Drag the signature to the right spot, resize it with the handles, and tap Done to save.</li>
+</ol>
+<p>If the document came as an email attachment, you can mark it up and sign right inside Mail, then send it back. Your signature is saved for next time, so it's a few taps after the first go.</p>
+
+<h2>Sign a PDF on Android</h2>
+<p>Android doesn't have one universal signing tool built in, so the reliable free route is the <strong>Adobe Acrobat Reader</strong> app (free from the Play Store):</p>
+<ol>
+<li>Open the PDF in Acrobat Reader.</li>
+<li>Tap the <strong>Fill &amp; Sign</strong> tool (the fountain-pen icon).</li>
+<li>Tap <strong>Create Signature</strong>, draw it with your finger, and save.</li>
+<li>Tap where it should go on the page, then resize and position it.</li>
+<li>Save or share the signed PDF.</li>
+</ol>
+<p>Some phones have their own option too — Samsung devices can annotate and sign PDFs with the S Pen, and Google Drive handles light annotation — but Adobe's Fill &amp; Sign is the most dependable free method across Android phones.</p>
+
+<h2>The catch with phone signing</h2>
+<p>All of the above do the same thing: they let <strong>you</strong> sign <strong>your own copy</strong> of a document. That's perfect when you just need to add your signature and send it back. But two common situations they don't solve:</p>
+<ul>
+<li><strong>Getting someone else to sign.</strong> You can't make a client, tenant, or colleague mark up a PDF on their phone — and talking them through Markup or installing Adobe is a hassle.</li>
+<li><strong>Proving who signed, and when.</strong> A signature image on a PDF has no record behind it. If it's ever questioned, you have nothing showing who signed or that the file wasn't changed afterward.</li>
+</ul>
+
+<h2>The easier way: send a link, they sign on their phone</h2>
+<p>When you need another person to sign — or you just want it done without installing anything — a signing tool is quicker than any of the above. With <a href="/app">Inkline</a>:</p>
+<ol>
+<li>Upload the PDF and add who needs to sign.</li>
+<li>They get a link (by email, or one you share on WhatsApp or anywhere).</li>
+<li>They open it, tap exactly where their signature goes, draw it with a finger, and that's it — <strong>no app, no account</strong>.</li>
+<li>Everyone gets the signed copy back, with a record of who signed and when.</li>
+</ol>
+<p>On a phone the whole thing takes about 20 seconds for the signer, and you can see who's signed and nudge anyone who hasn't. It's the difference between signing a document yourself and actually <em>getting a document signed</em>.</p>
+
+<h2>Is signing on your phone legally valid?</h2>
+<p>Yes, for most documents. Electronic signatures are legally recognised in Nigeria and most countries — what matters is a record of who signed and when, which is exactly what a proper signing tool keeps. We cover the Nigerian rules here: <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a></p>
+
+<p>Need to get something signed right now? <a href="/app">Send it with Inkline →</a> — free for 7 days, no account for your signer.</p>
+`,
+    related: ["how-to-sign-a-pdf-online-free", "what-is-an-electronic-signature", "is-electronic-signature-legal-in-nigeria"],
+  },
 ];
 
 export function allPosts(): Post[] {
