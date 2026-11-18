@@ -70,16 +70,22 @@ export async function sendSignRequestEmail(opts: {
   filename: string;
   signUrl: string;
   message?: string | null;
+  reminder?: boolean;
 }): Promise<boolean> {
-  const { to, signerName, senderName, filename, signUrl, message } = opts;
+  const { to, signerName, senderName, filename, signUrl, message, reminder } = opts;
+  const eyebrow = reminder ? `${escape(senderName)} is still waiting on your signature` : `${escape(senderName)} asks you to sign`;
+  const line = reminder
+    ? `Hi ${escape(signerName.split(" ")[0])}, just a quick reminder — this is still waiting for your signature. It takes about 20 seconds, with no app or account.`
+    : `Hi ${escape(signerName.split(" ")[0])}, it takes about 20 seconds — no app and no account needed.`;
+  const subject = reminder ? `Reminder: please sign ${filename}` : `${senderName} asks you to sign ${filename}`;
   const inner = `
-    <p style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:${SEAL};font-weight:700">${escape(senderName)} asks you to sign</p>
+    <p style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:${SEAL};font-weight:700">${eyebrow}</p>
     <h1 style="margin:0 0 16px;font-size:22px;line-height:1.25">${escape(filename)}</h1>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#45514b">Hi ${escape(signerName.split(" ")[0])}, it takes about 20 seconds — no app and no account needed.</p>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#45514b">${line}</p>
     ${message ? `<p style="margin:0 0 20px;padding:12px 14px;background:#f4f6f5;border-radius:10px;font-size:14px;color:#45514b">“${escape(message)}”</p>` : ""}
-    <p style="margin:0 0 8px">${button("Review & sign", signUrl)}</p>
+    <p style="margin:0 0 8px">${button(reminder ? "Sign now" : "Review & sign", signUrl)}</p>
     <p style="margin:18px 0 0;font-size:12px;color:#8a978f;word-break:break-all">Or paste this link into your browser:<br>${escape(signUrl)}</p>`;
-  return send(to, `${senderName} asks you to sign ${filename}`, shell(inner));
+  return send(to, subject, shell(inner));
 }
 
 /** Emails a party (signer or sender) the finished certified copy. */

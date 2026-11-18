@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Signer = { name: string; email: string };
 type SentSigner = { name: string; email: string | null; signUrl: string; emailed: boolean };
@@ -19,7 +19,7 @@ type SentDoc = {
   status: string;
   createdAt: string;
   pendingWithEmail: number;
-  signers: { name: string; email: string | null; status: string; signUrl: string }[];
+  signers: { name: string; email: string | null; status: string; signedAt: string | null; token: string; signUrl: string }[];
 };
 
 export default function WebSendPage() {
@@ -43,6 +43,14 @@ export default function WebSendPage() {
   const [copied, setCopied] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // Remember the sender's email across tabs and visits, so Sent/Drafts don't ask again.
+  useEffect(() => {
+    try { const e = localStorage.getItem("inkline_email"); if (e) setSenderEmail(e); } catch { /* storage unavailable */ }
+  }, []);
+  useEffect(() => {
+    try { if (senderEmail.trim()) localStorage.setItem("inkline_email", senderEmail.trim()); } catch { /* storage unavailable */ }
+  }, [senderEmail]);
+
   // Drafts state
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
@@ -53,7 +61,7 @@ export default function WebSendPage() {
   const [loadingSent, setLoadingSent] = useState(false);
   const [sentError, setSentError] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
-  const [resendMsg, setResendMsg] = useState<{ id: string; text: string } | null>(null);
+  const [resendMsg, setResendMsg] = useState<{ key: string; text: string } | null>(null);
 
   const setSigner = (i: number, patch: Partial<Signer>) =>
     setSigners((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -218,23 +226,37 @@ export default function WebSendPage() {
     }
   };
 
-  const resendInvites = async (d: SentDoc) => {
-    setResending(d.id); setResendMsg(null);
+  // Remind all pending signers (no token) or one specific signer (token).
+  const remind = async (d: SentDoc, token?: string) => {
+    const key = token ? `${d.id}:${token}` : d.id;
+    setResending(key); setResendMsg(null);
     try {
       const r = await fetch(`/api/web/sent/${d.id}/resend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: senderEmail.trim().toLowerCase() }),
+        body: JSON.stringify({ email: senderEmail.trim().toLowerCase(), ...(token ? { token } : {}) }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "Couldn't resend.");
-      setResendMsg({ id: d.id, text: j.sent > 0 ? `Resent to ${j.sent} signer${j.sent === 1 ? "" : "s"} ✓` : (j.note ?? "Nothing to resend.") });
+      if (!r.ok) throw new Error(j.error ?? "Couldn't send the reminder.");
+      setResendMsg({
+        key,
+        text: j.sent > 0
+          ? (token ? "Reminder sent ✓" : `Reminded ${j.sent} signer${j.sent === 1 ? "" : "s"} ✓`)
+          : (j.note ?? "Nothing to remind."),
+      });
     } catch (e) {
-      setResendMsg({ id: d.id, text: e instanceof Error ? e.message : "Couldn't resend." });
+      setResendMsg({ key, text: e instanceof Error ? e.message : "Couldn't send the reminder." });
     } finally {
       setResending(null);
     }
   };
+
+  // Navigation: when you open Sent or Drafts and we already know your email, load automatically.
+  useEffect(() => {
+    if (view === "sent" && senderEmail.trim() && sentDocs === null && !loadingSent) loadSent();
+    if (view === "drafts" && senderEmail.trim() && drafts === null && !loadingDrafts) loadDrafts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   // ============ Trial-ended / subscribe ============
   if (checkout) {
@@ -342,7 +364,7 @@ export default function WebSendPage() {
             <input className="field-input" type="email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="you@company.com" />
           </div>
           <button className="primary" onClick={loadSent} disabled={loadingSent}>
-            {loadingSent ? "Loading…" : "Show my sent documents"}
+            {loadingSent ? "Loading…" : sentDocs ? "Refresh" : "Show my sent documents"}
           </button>
           {sentError && <p className="err">{sentError}</p>}
         </div>
@@ -350,34 +372,54 @@ export default function WebSendPage() {
         {sentDocs && sentDocs.length === 0 && (
           <div className="card center"><p className="mute">Nothing sent yet.</p></div>
         )}
-        {(sentDocs ?? []).map((d, di) => (
-          <div className="card" key={d.id}>
-            <p className="eyebrow">{d.filename}</p>
-            <p className="mute" style={{ fontSize: 13, margin: "0 0 10px" }}>
-              Sent {new Date(d.createdAt).toLocaleString()} · {d.status === "signed" ? "fully signed ✓" : `${d.pendingWithEmail} awaiting signature`}
-            </p>
-            {d.signers.map((s, si) => (
-              <div key={si} style={{ marginBottom: 10 }}>
-                <p className="mute" style={{ fontSize: 13, margin: "0 0 4px" }}>
-                  <strong style={{ color: "var(--ink)" }}>{s.name}</strong>
-                  {s.status === "signed" ? " · signed ✓" : s.email ? ` · ${s.email}` : " · link only"}
-                </p>
-                {s.status !== "signed" && (
-                  <div className="linkrow">
-                    <input className="field-input mono" readOnly value={s.signUrl} onFocus={(e) => e.currentTarget.select()} />
-                    <button className="copybtn" onClick={() => copy(s.signUrl, di * 100 + si)}>{copied === di * 100 + si ? "Copied" : "Copy"}</button>
+        {(sentDocs ?? []).map((d, di) => {
+          const signedCount = d.signers.filter((s) => s.status === "signed").length;
+          return (
+            <div className="card" key={d.id}>
+              <p className="eyebrow">{d.filename}</p>
+              <p className="mute" style={{ fontSize: 13, margin: "0 0 12px" }}>
+                Sent {new Date(d.createdAt).toLocaleDateString()} · <strong style={{ color: signedCount === d.signers.length ? "var(--seal)" : "var(--ink)" }}>{signedCount} of {d.signers.length} signed</strong>
+              </p>
+
+              {d.signers.map((s, si) => {
+                const done = s.status === "signed";
+                const rkey = `${d.id}:${s.token}`;
+                return (
+                  <div key={si} className="sig-track">
+                    <div className="sig-track-head">
+                      <span className={`sig-pill ${done ? "ok" : "wait"}`}>{done ? "Signed" : "Awaiting"}</span>
+                      <div className="sig-track-who">
+                        <strong>{s.name}</strong>
+                        <span>{done ? (s.signedAt ? `signed ${new Date(s.signedAt).toLocaleDateString()}` : "signed") : (s.email || "link only — no email")}</span>
+                      </div>
+                      {!done && s.email && (
+                        <button className="copybtn ghost-btn" onClick={() => remind(d, s.token)} disabled={resending === rkey}>
+                          {resending === rkey ? "…" : "Remind"}
+                        </button>
+                      )}
+                    </div>
+                    {!done && (
+                      <div className="linkrow" style={{ marginTop: 6 }}>
+                        <input className="field-input mono" readOnly value={s.signUrl} onFocus={(e) => e.currentTarget.select()} />
+                        <button className="copybtn" onClick={() => copy(s.signUrl, di * 100 + si)}>{copied === di * 100 + si ? "Copied" : "Copy"}</button>
+                      </div>
+                    )}
+                    {resendMsg && resendMsg.key === rkey && <p className="mute" style={{ fontSize: 12, color: "var(--seal)", margin: "5px 0 0" }}>{resendMsg.text}</p>}
                   </div>
-                )}
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
-              <button className="copybtn" onClick={() => resendInvites(d)} disabled={resending === d.id || d.pendingWithEmail === 0}>
-                {resending === d.id ? "Sending…" : "Resend email invites"}
-              </button>
-              {resendMsg && resendMsg.id === d.id && <span className="mute" style={{ fontSize: 13, color: "var(--seal)" }}>{resendMsg.text}</span>}
+                );
+              })}
+
+              {d.pendingWithEmail > 0 && (
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+                  <button className="copybtn" onClick={() => remind(d)} disabled={resending === d.id}>
+                    {resending === d.id ? "Sending…" : `Remind all ${d.pendingWithEmail} pending`}
+                  </button>
+                  {resendMsg && resendMsg.key === d.id && <span className="mute" style={{ fontSize: 13, color: "var(--seal)" }}>{resendMsg.text}</span>}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
         <footer className="foot"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></footer>
       </main>
     );

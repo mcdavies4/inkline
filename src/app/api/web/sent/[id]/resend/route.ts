@@ -15,6 +15,8 @@ const BASE = process.env.APP_BASE_URL ?? "https://www.inklinesign.com";
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json().catch(() => ({}));
   const email = String(body?.email ?? "").trim().toLowerCase();
+  // Optional: remind just one signer (by their sign token). Omit to remind all pending.
+  const onlyToken = body?.token ? String(body.token) : null;
 
   const db = supabaseAdmin();
   const { data: request } = await db
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let pending = 0;
   for (const s of signers ?? []) {
     if (!s.email || s.status === "signed" || s.status === "declined") continue;
+    if (onlyToken && s.sign_token !== onlyToken) continue;
     pending++;
     const ok = await sendSignRequestEmail({
       to: s.email,
@@ -46,6 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       filename,
       signUrl: `${BASE}/sign/${s.sign_token}`,
       message: (request.message as string) || null,
+      reminder: true,
     });
     if (ok) sent++;
   }

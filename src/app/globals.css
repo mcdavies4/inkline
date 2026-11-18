@@ -880,3 +880,19 @@ textarea.field-input { resize: vertical; min-height: 56px; }
   0%, 100% { transform: translateX(-50%) translateY(0); }
   50% { transform: translateX(-50%) translateY(-5px); }
 }
+
+/* Sent tracker: per-signer status + reminders */
+.sig-track { padding: 12px 0; border-top: 1px solid var(--rule); }
+.sig-track:first-of-type { border-top: none; padding-top: 2px; }
+.sig-track-head { display: flex; align-items: center; gap: 10px; }
+.sig-track-who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.sig-track-who strong { font-size: 14.5px; color: var(--ink); }
+.sig-track-who span { font-size: 12.5px; color: var(--mute); word-break: break-word; }
+.sig-pill {
+  flex-shrink: 0;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 100px;
+}
+.sig-pill.ok { background: rgba(31, 122, 92, 0.14); color: var(--seal); }
+.sig-pill.wait { background: rgba(176, 124, 0, 0.14); color: #a97b00; }
+.copybtn.ghost-btn { background: transparent; color: var(--seal); border: 1px solid var(--seal); }

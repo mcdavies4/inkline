@@ -31,15 +31,15 @@ export async function GET(req: NextRequest) {
   const reqIds = reqs.map((r) => r.id);
   const docIds = Array.from(new Set(reqs.map((r) => r.document_id).filter(Boolean)));
   const [{ data: signers }, { data: docs }] = await Promise.all([
-    db.from("signers").select("request_id, name, email, sign_token, status").in("request_id", reqIds),
+    db.from("signers").select("request_id, name, email, sign_token, status, signed_at").in("request_id", reqIds),
     docIds.length ? db.from("documents").select("id, filename").in("id", docIds) : Promise.resolve({ data: [] as { id: string; filename: string }[] }),
   ]);
 
   const nameOf = new Map((docs ?? []).map((d) => [d.id, d.filename]));
-  const byReq = new Map<string, { name: string; email: string | null; status: string; signUrl: string }[]>();
+  const byReq = new Map<string, { name: string; email: string | null; status: string; signedAt: string | null; token: string; signUrl: string }[]>();
   for (const s of signers ?? []) {
     const arr = byReq.get(s.request_id) ?? [];
-    arr.push({ name: s.name, email: s.email, status: s.status, signUrl: `${BASE}/sign/${s.sign_token}` });
+    arr.push({ name: s.name, email: s.email, status: s.status, signedAt: s.signed_at ?? null, token: s.sign_token, signUrl: `${BASE}/sign/${s.sign_token}` });
     byReq.set(s.request_id, arr);
   }
 
