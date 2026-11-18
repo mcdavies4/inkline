@@ -152,11 +152,6 @@ export default function TapToSign(props: Props) {
         <p className="eyebrow">{props.senderName} asks you to sign</p>
         <h1>{props.filename}</h1>
         {props.message && <p className="note">&quot;{props.message}&quot;</p>}
-        {mode === "place" && !renderFailed && (
-          <p className="mute" style={{ fontSize: 13, marginTop: 8 }}>
-            Tap the document where your signature should go, then draw it below. {spot ? "Tap again to move it." : ""}
-          </p>
-        )}
       </div>
 
       {props.summary && (
@@ -170,6 +165,18 @@ export default function TapToSign(props: Props) {
       {mode === "place" && (
         <div className="place-pages">
           {rendering && <p className="mute" style={{ textAlign: "center" }}>Loading document…</p>}
+          {!rendering && pages.length > 0 && (
+            <div className={`sign-banner ${spot ? "ready" : "pulse"}`}>
+              <span className="sb-ico">{!spot ? "👆" : !signaturePng ? "✍️" : "✓"}</span>
+              <span>
+                {!spot
+                  ? "Tap the document where your signature should go"
+                  : !signaturePng
+                  ? "Now draw your signature in the box below"
+                  : "Looks good — tap “Sign document” to finish"}
+              </span>
+            </div>
+          )}
           {pages.map((pg, idx) => (
             <div
               key={idx}
@@ -179,6 +186,7 @@ export default function TapToSign(props: Props) {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={pg.dataUrl} alt={`Page ${idx + 1}`} draggable={false} />
+              {idx === 0 && !spot && <div className="tap-hint">👆 Tap to place your signature</div>}
               {spot && spot.page === idx && (
                 <div
                   className="sign-spot"
