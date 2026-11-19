@@ -109,6 +109,7 @@ export async function createStripeCheckout(
   params.set("client_reference_id", phone);
   params.set("metadata[phone]", phone);
   if (account.stripe_customer_id) params.set("customer", account.stripe_customer_id);
+  else if (phone.startsWith("web:")) params.set("customer_email", phone.slice(4));
   // In subscription mode Stripe creates the customer automatically —
   // customer_creation is only valid in payment mode, so we don't set it.
   params.set("subscription_data[metadata][phone]", phone);

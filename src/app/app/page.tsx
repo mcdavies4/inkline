@@ -39,7 +39,7 @@ export default function WebSendPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ filename: string; signers: SentSigner[] } | null>(null);
-  const [checkout, setCheckout] = useState<{ currency: string; label: string; url: string }[] | null>(null);
+  const [checkout, setCheckout] = useState<{ url: string | null; label: string } | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -147,7 +147,7 @@ export default function WebSendPage() {
         r = await fetch("/api/web/send", { method: "POST", body: buildForm() });
       }
       const j = await r.json();
-      if (r.status === 402 && j.needsSubscription) { setCheckout(Array.isArray(j.options) ? j.options : []); return; }
+      if (r.status === 402 && j.needsSubscription) { setCheckout({ url: j.checkoutUrl ?? null, label: j.priceLabel ?? "$9/month" }); return; }
       if (!r.ok) throw new Error(j.error ?? "Something went wrong. Please try again.");
       setSent({ filename: j.filename, signers: j.signers ?? [] });
     } catch (e) {
@@ -196,7 +196,7 @@ export default function WebSendPage() {
         body: JSON.stringify({ email: senderEmail.trim().toLowerCase() }),
       });
       const j = await r.json();
-      if (r.status === 402 && j.needsSubscription) { setView("compose"); setCheckout(Array.isArray(j.options) ? j.options : []); return; }
+      if (r.status === 402 && j.needsSubscription) { setView("compose"); setCheckout({ url: j.checkoutUrl ?? null, label: j.priceLabel ?? "$9/month" }); return; }
       if (!r.ok) throw new Error(j.error ?? "Couldn't send the draft.");
       setDrafts((prev) => (prev ?? []).filter((x) => x.id !== d.id));
       setView("compose");
@@ -283,13 +283,13 @@ export default function WebSendPage() {
           <p className="eyebrow">Your free trial has ended</p>
           <h1 style={{ margin: "0 0 10px", fontSize: 22 }}>Keep sending with Inkline Unlimited</h1>
           <p className="mute" style={{ marginBottom: 16 }}>
-            Unlimited documents and signers. Cancel anytime.{checkout.length > 1 && " Choose how you'd like to pay:"}
+            Unlimited documents and signers for <strong>{checkout.label}</strong>. Cancel anytime.
           </p>
-          {checkout.length > 0 ? checkout.map((opt) => (
-            <a key={opt.currency} className="primary" style={{ display: "block", textDecoration: "none", marginTop: 10 }} href={opt.url}>
-              Subscribe — {opt.label}
+          {checkout.url ? (
+            <a className="primary" style={{ display: "block", textDecoration: "none", marginTop: 10 }} href={checkout.url}>
+              Subscribe — {checkout.label}
             </a>
-          )) : <p className="err">Couldn&apos;t open checkout just now. Please try again shortly.</p>}
+          ) : <p className="err">Couldn&apos;t open checkout just now. Please try again shortly.</p>}
           <button className="ghost" onClick={() => setCheckout(null)}>← Back</button>
         </div>
       </main>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { checkoutOptionsForEmail } from "@/lib/paystack";
+import { createStripeCheckout, PRICING } from "@/lib/billing";
 import { webSendAllowed, deliverWebRequest, type WebSigner } from "@/lib/web";
 
 export const runtime = "nodejs";
@@ -37,9 +37,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // ---- Gate: founder, active plan, or inside the trial ----
   const gate = await webSendAllowed(senderEmail);
   if (!gate.allowed) {
-    const options = await checkoutOptionsForEmail(senderEmail);
+    const checkoutUrl = await createStripeCheckout(`web:${senderEmail}`, "monthly");
     return NextResponse.json(
-      { error: "Your 7-day free trial has ended.", needsSubscription: true, options },
+      { error: "Your 7-day free trial has ended.", needsSubscription: true, checkoutUrl, priceLabel: PRICING.monthly },
       { status: 402 }
     );
   }

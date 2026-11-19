@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createDocument } from "@/lib/requests";
-import { checkoutOptionsForEmail } from "@/lib/paystack";
+import { createStripeCheckout, PRICING } from "@/lib/billing";
 import { webSendAllowed, validateCompose, parseSigners, parseCcEmails, deliverWebRequest } from "@/lib/web";
 
 export const runtime = "nodejs";
@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
   if (!gate.allowed) {
-    const options = await checkoutOptionsForEmail(senderEmail);
+    const checkoutUrl = await createStripeCheckout(`web:${senderEmail}`, "monthly");
     return NextResponse.json(
-      { error: "Your 7-day free trial has ended.", needsSubscription: true, options },
+      { error: "Your 7-day free trial has ended.", needsSubscription: true, checkoutUrl, priceLabel: PRICING.monthly },
       { status: 402 }
     );
   }

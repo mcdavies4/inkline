@@ -526,18 +526,18 @@ async function recordDocumentSent(chatId: string) {
     .eq("phone_e164", `tg:${chatId}`);
 }
 
-/** Sends the Paystack subscribe link. `paywall` frames it as "out of free docs". */
+/** Sends the Stripe subscribe link. `paywall` frames it as "trial ended". */
 async function startSubscribe(chatId: string, paywall: boolean) {
-  const { initPaystackSubscription, PAYSTACK_PRICE_LABEL } = await import("@/lib/paystack");
-  const url = await initPaystackSubscription(chatId);
+  const { createStripeCheckout, PRICING } = await import("@/lib/billing");
+  const url = await createStripeCheckout(`tg:${chatId}`, "monthly");
   if (!url) {
     return sendText(chatId, "Couldn't open checkout just now — please try again shortly.");
   }
   const intro = paywall ? "Your 7-day free trial has ended 🎉" : "<b>Inkline Unlimited</b>";
   await sendCtaLink(
     chatId,
-    `${intro}\n\nGo unlimited for <b>${PAYSTACK_PRICE_LABEL}</b> — unlimited documents and signers, cancel anytime.`,
-    `Subscribe — ${PAYSTACK_PRICE_LABEL}`,
+    `${intro}\n\nGo unlimited for <b>${PRICING.monthly}</b> — unlimited documents and signers, cancel anytime.`,
+    `Subscribe — ${PRICING.monthly}`,
     url
   );
 }
@@ -546,49 +546,39 @@ async function sendPaywall(chatId: string) {
   return startSubscribe(chatId, true);
 }
 
-/** BILLING command — subscription status, or the subscribe link. */
+/** BILLING command — subscription status + manage link, or the subscribe link. */
 async function handleBilling(chatId: string) {
-  const { getAccount } = await import("@/lib/billing");
-  const { PAYSTACK_PRICE_LABEL } = await import("@/lib/paystack");
+  const { getAccount, createStripePortal, PRICING } = await import("@/lib/billing");
   const account = await getAccount(`tg:${chatId}`);
   if (account.plan === "active" || account.plan === "past_due") {
-    return sendText(
-      chatId,
-      `You're on <b>Inkline Unlimited</b> (${PAYSTACK_PRICE_LABEL}).\n\n` +
-        (account.plan === "past_due" ? "⚠️ Your last payment failed — reply PAY to renew.\n\n" : "") +
-        `To cancel, reply <b>CANCELSUB</b>.`
-    );
+    const portal = await createStripePortal(`tg:${chatId}`);
+    const body =
+      `You're on <b>Inkline Unlimited</b> (${PRICING.monthly}).\n\n` +
+      (account.plan === "past_due" ? "⚠️ Your last payment failed — update your card below.\n\n" : "") +
+      `Manage your card or cancel anytime below.`;
+    if (portal) return sendCtaLink(chatId, body, "Manage subscription", portal);
+    return sendText(chatId, body + "\n\nTo cancel, reply <b>CANCELSUB</b>.");
   }
   return startSubscribe(chatId, false);
 }
 
-/** CANCELSUB — disables the Paystack subscription. */
+/** CANCELSUB — opens the Stripe billing portal to cancel/manage. */
 async function handleCancelSub(chatId: string) {
-  const supa = db();
-  const { data: acc } = await supa
-    .from("accounts")
-    .select("paystack_subscription_code, paystack_email_token, plan")
-    .eq("phone_e164", `tg:${chatId}`)
-    .maybeSingle();
-  if (!acc || (acc.plan !== "active" && acc.plan !== "past_due")) {
+  const { getAccount, createStripePortal } = await import("@/lib/billing");
+  const account = await getAccount(`tg:${chatId}`);
+  if (account.plan !== "active" && account.plan !== "past_due") {
     return sendText(chatId, "You don't have an active subscription.");
   }
-  if (!acc.paystack_subscription_code || !acc.paystack_email_token) {
-    return sendText(
+  const portal = await createStripePortal(`tg:${chatId}`);
+  if (portal) {
+    return sendCtaLink(
       chatId,
-      "I couldn't find your subscription details to cancel automatically. Please email inklinesign@outlook.com and we'll sort it."
+      "Manage or cancel your Inkline subscription below — you can cancel in a couple of taps.",
+      "Manage subscription",
+      portal
     );
   }
-  const { disablePaystackSubscription } = await import("@/lib/paystack");
-  const ok = await disablePaystackSubscription(acc.paystack_subscription_code, acc.paystack_email_token);
-  if (ok) {
-    await supa.from("accounts").update({ plan: "cancelled" }).eq("phone_e164", `tg:${chatId}`);
-    return sendText(
-      chatId,
-      "Your subscription is cancelled — you won't be charged again. Resubscribe anytime with PAY."
-    );
-  }
-  return sendText(chatId, "Couldn't cancel just now — please try again shortly, or email inklinesign@outlook.com.");
+  return sendText(chatId, "Couldn't open the billing page just now — please try again shortly, or email inklinesign@outlook.com.");
 }
 
 // ============================================================

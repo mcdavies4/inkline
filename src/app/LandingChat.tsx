@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 const BOT_URL = "https://t.me/InklineSignbot?start=hello";
 const APP_URL = "/app";
 // Override via NEXT_PUBLIC_PRICE_LABEL when the plan/currency changes (e.g. "$5/month").
-const PRICE_LABEL = process.env.NEXT_PUBLIC_PRICE_LABEL ?? "₦10,000/month";
+const PRICE_LABEL = process.env.NEXT_PUBLIC_PRICE_LABEL ?? "$9/month";
 const [PRICE_AMOUNT, ...PRICE_REST] = PRICE_LABEL.split("/");
 
 const SCRIPT: { who: "them" | "bot"; kind: "text" | "doc" | "signed"; text?: string; label?: string; note?: string }[] = [
