@@ -57,6 +57,16 @@ export function sendCtaLink(to: string, bodyText: string, buttonText: string, ur
   });
 }
 
+/** Like sendCtaLink but with several stacked buttons (one per row). */
+export function sendCtaButtons(to: string, bodyText: string, buttons: { text: string; url: string }[]) {
+  return call("sendMessage", {
+    chat_id: to,
+    text: bodyText,
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons.map((b) => [{ text: b.text, url: b.url }]) },
+  });
+}
+
 /**
  * Downloads an inbound document (the sender's PDF) by Telegram file_id.
  * Two steps: getFile → download from the file path. Note Telegram's Bot API

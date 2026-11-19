@@ -37,9 +37,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // ---- Gate: founder, active plan, or inside the trial ----
   const gate = await webSendAllowed(senderEmail);
   if (!gate.allowed) {
-    const checkoutUrl = await createStripeCheckout(`web:${senderEmail}`, "monthly");
+    const [monthly, annual] = await Promise.all([
+      createStripeCheckout(`web:${senderEmail}`, "monthly"),
+      createStripeCheckout(`web:${senderEmail}`, "annual"),
+    ]);
+    const plans = [
+      monthly ? { plan: "monthly", label: PRICING.monthly, url: monthly } : null,
+      annual ? { plan: "annual", label: PRICING.annual, url: annual } : null,
+    ].filter(Boolean);
     return NextResponse.json(
-      { error: "Your 7-day free trial has ended.", needsSubscription: true, checkoutUrl, priceLabel: PRICING.monthly },
+      {
+        error: "Your 7-day free trial has ended.",
+        needsSubscription: true,
+        plans,
+        checkoutUrl: monthly,
+        priceLabel: PRICING.monthly,
+      },
       { status: 402 }
     );
   }

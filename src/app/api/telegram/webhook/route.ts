@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendText, sendDocument, sendCtaLink, fetchMedia } from "@/lib/telegram";
+import { sendText, sendDocument, sendCtaLink, sendCtaButtons, fetchMedia } from "@/lib/telegram";
 import { TEMPLATES, findTemplate, type DocTemplate } from "@/lib/templates";
 
 export const runtime = "nodejs";
@@ -529,16 +529,30 @@ async function recordDocumentSent(chatId: string) {
 /** Sends the Stripe subscribe link. `paywall` frames it as "trial ended". */
 async function startSubscribe(chatId: string, paywall: boolean) {
   const { createStripeCheckout, PRICING } = await import("@/lib/billing");
-  const url = await createStripeCheckout(`tg:${chatId}`, "monthly");
-  if (!url) {
+  const [monthly, annual] = await Promise.all([
+    createStripeCheckout(`tg:${chatId}`, "monthly"),
+    createStripeCheckout(`tg:${chatId}`, "annual"),
+  ]);
+  if (!monthly && !annual) {
     return sendText(chatId, "Couldn't open checkout just now — please try again shortly.");
   }
   const intro = paywall ? "Your 7-day free trial has ended 🎉" : "<b>Inkline Unlimited</b>";
+  const buttons: { text: string; url: string }[] = [];
+  if (monthly) buttons.push({ text: `Monthly — ${PRICING.monthly}`, url: monthly });
+  if (annual) buttons.push({ text: `Yearly — ${PRICING.annual}`, url: annual });
+  // Two plans → stacked buttons; single plan → keep the one-button layout.
+  if (buttons.length > 1) {
+    return sendCtaButtons(
+      chatId,
+      `${intro}\n\nGo unlimited — unlimited documents and signers, cancel anytime. Pick a plan:`,
+      buttons
+    );
+  }
   await sendCtaLink(
     chatId,
-    `${intro}\n\nGo unlimited for <b>${PRICING.monthly}</b> — unlimited documents and signers, cancel anytime.`,
-    `Subscribe — ${PRICING.monthly}`,
-    url
+    `${intro}\n\nGo unlimited for <b>${buttons[0].text.replace(/^.*— /, "")}</b> — unlimited documents and signers, cancel anytime.`,
+    buttons[0].text,
+    buttons[0].url
   );
 }
 
