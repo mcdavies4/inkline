@@ -729,13 +729,20 @@ textarea.field-input { resize: vertical; min-height: 56px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px dashed var(--seal);
-  background: rgba(31, 122, 92, 0.08);
-  border-radius: 3px;
+  border: 2.5px dashed var(--seal);
+  background: rgba(31, 122, 92, 0.14);
+  border-radius: 4px;
   overflow: visible;
   cursor: move;
   touch-action: none;
+  box-shadow: 0 0 0 2px rgba(31, 122, 92, 0.12);
+  animation: spotpop 1.8s ease-in-out infinite;
 }
+@keyframes spotpop {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(31, 122, 92, 0.12); }
+  50% { box-shadow: 0 0 0 5px rgba(31, 122, 92, 0.20); }
+}
+.sign-spot.has-sig { animation: none; background: transparent; border-style: solid; }
 .sign-spot-handle {
   position: absolute;
   right: -9px;

@@ -32,6 +32,7 @@ export default function TapToSign(props: Props) {
   // "place" = pick a spot on the page; "bottom" = fallback pad at the foot.
   const [mode, setMode] = useState<"place" | "bottom">("place");
   const padRef = useRef<HTMLDivElement>(null);
+  const didAutoPlace = useRef(false);
 
   // Render the PDF to images so the signer can tap where to sign.
   useEffect(() => {
@@ -71,6 +72,16 @@ export default function TapToSign(props: Props) {
     return () => { cancelled = true; };
   }, [props.pdfUrl]);
 
+  // As soon as the document is visible, drop a signature box on it automatically
+  // (bottom of the last page — where signatures usually go) so the signer always
+  // has a clear, labelled target instead of a blank page they must guess at.
+  useEffect(() => {
+    if (mode !== "place" || didAutoPlace.current || pages.length === 0 || spot) return;
+    didAutoPlace.current = true;
+    const lastPage = pages.length - 1;
+    setSpot({ page: lastPage, x: 0.1, y: 0.8, w: BOX_W, h: BOX_H });
+  }, [pages, mode, spot]);
+
   const tapPage = (idx: number, e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const cx = (e.clientX - rect.left) / rect.width;
@@ -80,8 +91,10 @@ export default function TapToSign(props: Props) {
     const x = Math.max(0, Math.min(1 - w, cx - w / 2));
     const y = Math.max(0, Math.min(1 - h, cy - h / 2));
     setSpot({ page: idx, x, y, w, h });
-    // Bring the signature pad into view so they can draw next.
-    setTimeout(() => padRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    // If they haven't drawn yet, bring the signature pad into view so they can.
+    if (!signaturePng) {
+      setTimeout(() => padRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    }
   };
 
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -166,14 +179,12 @@ export default function TapToSign(props: Props) {
         <div className="place-pages">
           {rendering && <p className="mute" style={{ textAlign: "center" }}>Loading document…</p>}
           {!rendering && pages.length > 0 && (
-            <div className={`sign-banner ${spot ? "ready" : "pulse"}`}>
-              <span className="sb-ico">{!spot ? "👆" : !signaturePng ? "✍️" : "✓"}</span>
+            <div className={`sign-banner ${signaturePng ? "ready" : "pulse"}`}>
+              <span className="sb-ico">{!signaturePng ? "✍️" : "✓"}</span>
               <span>
-                {!spot
-                  ? "Tap the document where your signature should go"
-                  : !signaturePng
-                  ? "Now draw your signature in the box below"
-                  : "Looks good — tap “Sign document” to finish"}
+                {!signaturePng
+                  ? "Draw your signature below — it drops onto the green box on your document"
+                  : "Done! Drag the box if you want to move it, then tap “Sign document”"}
               </span>
             </div>
           )}
@@ -186,10 +197,9 @@ export default function TapToSign(props: Props) {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={pg.dataUrl} alt={`Page ${idx + 1}`} draggable={false} />
-              {idx === 0 && !spot && <div className="tap-hint">👆 Tap to place your signature</div>}
               {spot && spot.page === idx && (
                 <div
-                  className="sign-spot"
+                  className={`sign-spot ${signaturePng ? "has-sig" : ""}`}
                   style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, width: `${spot.w * 100}%`, height: `${spot.h * 100}%` }}
                   onPointerDown={(e) => startDrag("move", e)}
                 >
@@ -197,7 +207,7 @@ export default function TapToSign(props: Props) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={signaturePng} alt="" style={{ maxWidth: "100%", maxHeight: "100%", pointerEvents: "none" }} />
                   ) : (
-                    <span className="fill-label">Sign here · drag to move</span>
+                    <span className="fill-label">Your signature<br />drag to move</span>
                   )}
                   <div className="sign-spot-handle" onPointerDown={(e) => startDrag("resize", e)} />
                 </div>
@@ -209,7 +219,7 @@ export default function TapToSign(props: Props) {
 
       <div className="card" ref={padRef}>
         <p className="eyebrow">
-          {mode === "place" ? (spot ? "Draw your signature" : "First, tap where to sign above") : "Sign with your finger"}
+          {mode === "place" ? "Draw your signature with your finger" : "Sign with your finger"}
         </p>
         <SignatureField onChange={setSignaturePng} height={200} penColor="#1a2238" />
 
