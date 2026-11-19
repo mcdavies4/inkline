@@ -7,6 +7,9 @@ const APP_URL = "/app";
 // Override via NEXT_PUBLIC_PRICE_LABEL when the plan/currency changes (e.g. "$5/month").
 const PRICE_LABEL = process.env.NEXT_PUBLIC_PRICE_LABEL ?? "$9/month";
 const [PRICE_AMOUNT, ...PRICE_REST] = PRICE_LABEL.split("/");
+// Yearly plan — override via NEXT_PUBLIC_ANNUAL_LABEL (e.g. "$90/year").
+const ANNUAL_LABEL = process.env.NEXT_PUBLIC_ANNUAL_LABEL ?? "$90/year";
+const [ANNUAL_AMOUNT, ...ANNUAL_REST] = ANNUAL_LABEL.split("/");
 
 const SCRIPT: { who: "them" | "bot"; kind: "text" | "doc" | "signed"; text?: string; label?: string; note?: string }[] = [
   { who: "them", kind: "doc", label: "tenancy-agreement.pdf" },
@@ -139,10 +142,15 @@ export default function LandingChat() {
             <div className="c-v">7 <span>days</span></div>
             <p>Everything included. No card needed to start.</p>
           </div>
-          <div className="card pro">
-            <div className="c-k">Unlimited</div>
+          <div className="card">
+            <div className="c-k">Monthly</div>
             <div className="c-v">{PRICE_AMOUNT}{PRICE_REST.length ? <span>/{PRICE_REST.join("/")}</span> : null}</div>
             <p>Unlimited documents and signers, after your trial. Pay by card. Cancel anytime.</p>
+          </div>
+          <div className="card pro">
+            <div className="c-k">Yearly <span className="save">2 months free</span></div>
+            <div className="c-v">{ANNUAL_AMOUNT}{ANNUAL_REST.length ? <span>/{ANNUAL_REST.join("/")}</span> : null}</div>
+            <p>Same unlimited plan, billed once a year. Best value. Cancel anytime.</p>
           </div>
         </div>
         <a className="cta big" href={APP_URL}>Start free →</a>
@@ -279,7 +287,8 @@ const CSS = `
 .trail{margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--deep);}
 
 .price{max-width:1140px;margin:0 auto;padding:86px 28px;text-align:center;}
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:660px;margin:0 auto;}
+.cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;max-width:900px;margin:0 auto;}
+.save{display:inline-block;margin-left:6px;background:var(--green);color:var(--ink);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:2px 7px;border-radius:20px;vertical-align:middle;}
 .card{border:2px solid var(--line);border-radius:22px;padding:30px 26px;text-align:left;background:#fff;}
 .card.pro{border-color:var(--ink);position:relative;}
 .card.pro::after{content:"popular";position:absolute;top:-11px;right:20px;background:var(--green);color:var(--ink);
