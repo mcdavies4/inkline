@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDocument } from "@/lib/requests";
+import { randomBytes } from "crypto";
+import { createDocument, createRequestPending } from "@/lib/requests";
+import { supabaseAdmin } from "@/lib/supabase";
 import { createStripeCheckout, PRICING } from "@/lib/billing";
 import { webSendAllowed, validateCompose, parseSigners, parseCcEmails, deliverWebRequest } from "@/lib/web";
 
@@ -71,9 +73,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // "place_first" = the sender wants to drop signature fields on the document
+  // before it goes out. We create the request but hold delivery; the /place
+  // editor saves the fields and triggers the email send.
+  const placeFirst = String(form.get("place_first") ?? "") === "1";
+
   // ---- Store the PDF + create and deliver the request ----
   try {
     const doc = await createDocument(Buffer.from(await file.arrayBuffer()), file.name);
+
+    if (placeFirst) {
+      const requestId = await createRequestPending({
+        documentId: doc.id,
+        senderName,
+        senderEmail,
+        message,
+        ccEmails,
+        signers: signers.map((s) => ({ name: s.name, email: s.email, phone: `web:${s.email ?? "anon"}` })),
+        flow: "parallel",
+      });
+      const token = randomBytes(24).toString("base64url");
+      const db = supabaseAdmin();
+      const { error: tokErr } = await db.from("placement_tokens").insert({ token, request_id: requestId });
+      if (tokErr) throw new Error(tokErr.message);
+      return NextResponse.json({ ok: true, placeToken: token, filename: doc.filename });
+    }
+
     const { requestId, signers: results } = await deliverWebRequest({
       documentId: doc.id,
       filename: doc.filename,

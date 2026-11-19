@@ -163,6 +163,30 @@ export default function WebSendPage() {
     }
   };
 
+  // ---- Place fields, then send (sender marks where each signer signs) ----
+  const placeThenSend = async () => {
+    if (busy) return;
+    setError(null); setNotice(null); setCheckout(null);
+    if (!senderName.trim()) return setError("Please add your name.");
+    if (!senderEmail.trim()) return setError("Please add your email so we can send you the signed copy.");
+    if (cleanSigners().length === 0) return setError("Add at least one signer.");
+    if (!file) return setError("Please attach a PDF to place fields on.");
+
+    setBusy(true);
+    try {
+      const r = await fetch("/api/web/send", { method: "POST", body: buildForm({ place_first: "1" }) });
+      const j = await r.json();
+      if (r.status === 402 && j.needsSubscription) { setCheckout(plansFrom(j)); return; }
+      if (!r.ok) throw new Error(j.error ?? "Something went wrong. Please try again.");
+      if (j.placeToken) { window.location.href = `/place/${j.placeToken}`; return; }
+      throw new Error("Couldn't open the field editor. Please try again.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // ---- Drafts list ----
   const loadDrafts = async () => {
     if (!senderEmail.trim()) { setDraftError("Enter your email to see your drafts."); return; }
@@ -549,9 +573,23 @@ export default function WebSendPage() {
       {notice && <p className="mute" style={{ margin: 0, color: "var(--seal)" }}>{notice}</p>}
       {error && <p className="err" style={{ margin: 0 }}>{error}</p>}
 
-      <button className="primary" onClick={submit} disabled={busy || savingDraft}>
-        {busy ? "Sending…" : "Send for signing"}
-      </button>
+      {file && !draftId ? (
+        <>
+          <button className="primary" onClick={placeThenSend} disabled={busy || savingDraft}>
+            {busy ? "Opening…" : "Choose where they sign →"}
+          </button>
+          <p className="field-hint" style={{ textAlign: "center", margin: "0 0 2px" }}>
+            Mark the exact spot each person signs — they just tap it. Recommended.
+          </p>
+          <button className="ghost" onClick={submit} disabled={busy || savingDraft}>
+            Or just send — signer picks the spot
+          </button>
+        </>
+      ) : (
+        <button className="primary" onClick={submit} disabled={busy || savingDraft}>
+          {busy ? "Sending…" : "Send for signing"}
+        </button>
+      )}
       <button className="ghost" onClick={() => saveDraft(false)} disabled={busy || savingDraft}>
         {savingDraft ? "Saving…" : draftId ? "Update draft" : "Save as draft"}
       </button>

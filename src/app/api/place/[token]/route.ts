@@ -41,6 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     pdfUrl: pdfUrl?.signedUrl ?? null,
     signers: signers.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })),
     multiSigner: signers.length > 1,
+    isWeb: !!request.sender_email,
   });
 }
 
@@ -98,6 +99,18 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   await db.from("sign_requests").update({ placement: "done" }).eq("id", request.id);
   await db.from("placement_tokens").update({ used_at: new Date().toISOString() }).eq("token", params.token);
+
+  // WEB sender: deliver the signing links by email (no Telegram/WhatsApp chat).
+  if (request.sender_email) {
+    const { deliverPlacedWebRequest } = await import("@/lib/web");
+    let delivered = false;
+    try {
+      ({ delivered } = await deliverPlacedWebRequest(request.id));
+    } catch (e) {
+      console.error("PLACE(web): delivery failed —", e instanceof Error ? e.message : e);
+    }
+    return NextResponse.json({ ok: true, delivered, web: true });
+  }
 
   // Kick off delivery now that fields are placed, and tell the sender how it went.
   const { deliverPlacedRequest } = await import("@/lib/requests");

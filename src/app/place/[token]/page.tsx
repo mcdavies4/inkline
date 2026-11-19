@@ -32,7 +32,7 @@ const FIELD_SIZE: Record<FieldType, { w: number; h: number }> = {
 
 export default function PlacePage() {
   const { token } = useParams<{ token: string }>();
-  const [meta, setMeta] = useState<{ filename: string; pdfUrl: string; signers: Signer[]; multiSigner: boolean } | null>(null);
+  const [meta, setMeta] = useState<{ filename: string; pdfUrl: string; signers: Signer[]; multiSigner: boolean; isWeb?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
   const [activeType, setActiveType] = useState<FieldType>("signature");
@@ -217,8 +217,17 @@ export default function PlacePage() {
       <main className="wrap">
         <div className="card center">
           <div className="tick">✓</div>
-          <h1>Fields placed</h1>
-          <p className="mute">Your document is on its way to your signers, with the fields exactly where you put them. You can close this page and head back to WhatsApp.</p>
+          <h1>Sent — fields placed</h1>
+          <p className="mute">
+            {meta?.isWeb
+              ? "Your document is on its way to your signers by email, with the signature fields exactly where you put them. They'll just tap each field and sign."
+              : "Your document is on its way to your signers, with the fields exactly where you put them. You can close this page and head back to WhatsApp."}
+          </p>
+          {meta?.isWeb && (
+            <a className="primary" style={{ display: "inline-block", textDecoration: "none", marginTop: 12 }} href="/app">
+              Back to Inkline
+            </a>
+          )}
         </div>
       </main>
     );

@@ -133,3 +133,53 @@ export async function deliverWebRequest(input: {
 
   return { requestId, signers: results };
 }
+
+/**
+ * Delivers a web request that already exists AND has had its signature fields
+ * placed by the sender (via the /place editor). Emails every signer who has an
+ * address their signing link, and counts the send against the account.
+ * Mirrors deliverWebRequest's email step, but for an already-created request.
+ */
+export async function deliverPlacedWebRequest(requestId: string): Promise<{ delivered: boolean }> {
+  const db = supabaseAdmin();
+  const { data: request } = await db
+    .from("sign_requests")
+    .select("*, documents(filename)")
+    .eq("id", requestId)
+    .single();
+  if (!request) throw new Error("Request not found");
+  const filename = (request.documents as { filename?: string } | null)?.filename ?? "document.pdf";
+
+  const { data: rows } = await db
+    .from("signers")
+    .select("name, email, sign_token")
+    .eq("request_id", requestId)
+    .order("sign_order", { ascending: true });
+
+  let delivered = false;
+  for (const r of rows ?? []) {
+    if (!r.email) continue;
+    const ok = await sendSignRequestEmail({
+      to: r.email,
+      signerName: r.name,
+      senderName: request.sender_name,
+      filename,
+      signUrl: `${BASE}/sign/${r.sign_token}`,
+      message: request.message ?? null,
+    });
+    if (ok) delivered = true;
+  }
+
+  // Count this send against the account (once, at delivery time).
+  if (request.sender_email) {
+    const key = `web:${String(request.sender_email).toLowerCase()}`;
+    const { data: acct } = await db.from("accounts").select("documents_used").eq("phone_e164", key).maybeSingle();
+    await db
+      .from("accounts")
+      .update({ documents_used: (acct?.documents_used ?? 0) + 1 })
+      .eq("phone_e164", key)
+      .then(() => {}, () => {});
+  }
+
+  return { delivered };
+}
