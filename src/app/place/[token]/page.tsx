@@ -240,10 +240,15 @@ export default function PlacePage() {
         <span className="place-file">{meta.filename}</span>
       </header>
 
-      <div className="place-hint">Pick a field, then tap where it goes. Drag to fine-tune, tap ✕ to remove.</div>
+      <div className="place-hint">
+        {fields.length === 0
+          ? `👆 Tap the document where the ${FIELD_LABEL[activeType].toLowerCase()} should go${meta.multiSigner ? ` for ${signerName(activeSigner)}` : ""}.`
+          : "Drag a box to move it · tap ✕ to remove · add more, then tap “Done — send”."}
+      </div>
 
       {/* Field type picker */}
       <div className="place-toolbar">
+        <span style={{ alignSelf: "center", fontSize: 13, color: "var(--muted)", marginRight: 2 }}>Add:</span>
         {(Object.keys(FIELD_LABEL) as FieldType[]).map((tp) => (
           <button
             key={tp}
@@ -289,6 +294,9 @@ export default function PlacePage() {
             onPointerUp={endDrag}
           >
             <img src={pg.dataUrl} alt={`Page ${idx + 1}`} draggable={false} />
+            {idx === 0 && fields.length === 0 && (
+              <div className="tap-hint">👆 Tap to place the {FIELD_LABEL[activeType].toLowerCase()}</div>
+            )}
             {fields
               .filter((f) => f.page === idx)
               .map((f) => (

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
+import { createRequestPending } from "@/lib/requests";
 import { createStripeCheckout, PRICING } from "@/lib/billing";
 import { webSendAllowed, deliverWebRequest, type WebSigner } from "@/lib/web";
 
@@ -57,14 +59,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
   }
 
+  const ccEmails = String(draft.cc_emails ?? "")
+    .split(/[,\s;]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const message = (draft.message as string) || null;
+  const placeFirst = String(body?.place_first ?? "") === "1";
+
   try {
+    // "place_first" = the sender wants to mark where each person signs before it
+    // goes out. Create the request but hold delivery; the /place editor sends it.
+    if (placeFirst) {
+      const requestId = await createRequestPending({
+        documentId: draft.document_id as string,
+        senderName,
+        senderEmail,
+        message,
+        ccEmails,
+        signers: signers.map((s) => ({ name: s.name, email: s.email, phone: `web:${s.email ?? "anon"}` })),
+        flow: "parallel",
+      });
+      const token = randomBytes(24).toString("base64url");
+      const { error: tokErr } = await db.from("placement_tokens").insert({ token, request_id: requestId });
+      if (tokErr) throw new Error(tokErr.message);
+      // Draft is now a live (pending) request — remove it.
+      await db.from("web_drafts").delete().eq("id", params.id);
+      return NextResponse.json({ ok: true, placeToken: token, filename: draft.filename });
+    }
+
     const { requestId, signers: results } = await deliverWebRequest({
       documentId: draft.document_id as string,
       filename: (draft.filename as string) || "document.pdf",
       senderName,
       senderEmail,
-      message: (draft.message as string) || null,
-      ccEmails: String(draft.cc_emails ?? "").split(/[,\s;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean),
+      message,
+      ccEmails,
       signers,
       accountDocsUsed: gate.account.documents_used,
     });

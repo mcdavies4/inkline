@@ -164,17 +164,29 @@ export default function WebSendPage() {
   };
 
   // ---- Place fields, then send (sender marks where each signer signs) ----
+  // Works for a fresh compose and for a loaded draft.
   const placeThenSend = async () => {
     if (busy) return;
     setError(null); setNotice(null); setCheckout(null);
     if (!senderName.trim()) return setError("Please add your name.");
     if (!senderEmail.trim()) return setError("Please add your email so we can send you the signed copy.");
     if (cleanSigners().length === 0) return setError("Add at least one signer.");
-    if (!file) return setError("Please attach a PDF to place fields on.");
+    if (!file && !draftId) return setError("Please attach a PDF to place fields on.");
 
     setBusy(true);
     try {
-      const r = await fetch("/api/web/send", { method: "POST", body: buildForm({ place_first: "1" }) });
+      let r: Response;
+      if (draftId) {
+        const ok = await saveDraft(true);
+        if (!ok) { setBusy(false); return; }
+        r = await fetch(`/api/web/draft/${draftId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: senderEmail.trim().toLowerCase(), place_first: "1" }),
+        });
+      } else {
+        r = await fetch("/api/web/send", { method: "POST", body: buildForm({ place_first: "1" }) });
+      }
       const j = await r.json();
       if (r.status === 402 && j.needsSubscription) { setCheckout(plansFrom(j)); return; }
       if (!r.ok) throw new Error(j.error ?? "Something went wrong. Please try again.");
@@ -217,17 +229,18 @@ export default function WebSendPage() {
     setView("compose");
   };
 
-  const sendDraft = async (d: Draft) => {
+  const sendDraft = async (d: Draft, placeFirst = false) => {
     setDraftError(null);
     try {
       const r = await fetch(`/api/web/draft/${d.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: senderEmail.trim().toLowerCase() }),
+        body: JSON.stringify({ email: senderEmail.trim().toLowerCase(), ...(placeFirst ? { place_first: "1" } : {}) }),
       });
       const j = await r.json();
       if (r.status === 402 && j.needsSubscription) { setView("compose"); setCheckout(plansFrom(j)); return; }
       if (!r.ok) throw new Error(j.error ?? "Couldn't send the draft.");
+      if (placeFirst && j.placeToken) { window.location.href = `/place/${j.placeToken}`; return; }
       setDrafts((prev) => (prev ?? []).filter((x) => x.id !== d.id));
       setView("compose");
       setSent({ filename: j.filename, signers: j.signers ?? [] });
@@ -393,7 +406,8 @@ export default function WebSendPage() {
               <br />Saved {new Date(d.updatedAt).toLocaleString()}
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="copybtn" onClick={() => sendDraft(d)}>Send now</button>
+              <button className="copybtn" onClick={() => sendDraft(d, true)}>Choose where they sign →</button>
+              <button className="copybtn" style={{ background: "transparent", color: "var(--seal)" }} onClick={() => sendDraft(d)}>Just send</button>
               <button className="copybtn" style={{ background: "transparent", color: "var(--seal)" }} onClick={() => editDraft(d)}>Edit</button>
               <button className="copybtn" style={{ background: "transparent", color: "var(--err)", borderColor: "var(--err)" }} onClick={() => deleteDraft(d)}>Delete</button>
             </div>
@@ -573,7 +587,7 @@ export default function WebSendPage() {
       {notice && <p className="mute" style={{ margin: 0, color: "var(--seal)" }}>{notice}</p>}
       {error && <p className="err" style={{ margin: 0 }}>{error}</p>}
 
-      {file && !draftId ? (
+      {file || draftId ? (
         <>
           <button className="primary" onClick={placeThenSend} disabled={busy || savingDraft}>
             {busy ? "Opening…" : "Choose where they sign →"}
