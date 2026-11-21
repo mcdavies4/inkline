@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const GTM_ID = "GTM-PQ98F6T9";
@@ -60,6 +61,7 @@ gtag('js', new Date());`}
           />
         </noscript>
         {children}
+        <Analytics />
       </body>
     </html>
   );
