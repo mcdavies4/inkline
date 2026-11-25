@@ -42,7 +42,7 @@ export function validateCompose(input: {
   if (!EMAIL_RE.test(input.senderEmail)) return "Please enter a valid email so we can send you the signed copy.";
   if ((input.requireSigners ?? true) && input.signers.length === 0)
     return "Add at least one signer (a name, and their email if you have it).";
-  if (input.signers.length > 10) return "Up to 10 signers per document.";
+  if (input.signers.length > 50) return "Up to 50 signers per document.";
   for (const s of input.signers) {
     if (s.email && !EMAIL_RE.test(s.email)) return `“${s.email}” doesn't look like a valid email.`;
   }

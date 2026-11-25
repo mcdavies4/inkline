@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+const MAX_SIGNERS = 50;
 type Signer = { name: string; email: string };
 type SentSigner = { name: string; email: string | null; signUrl: string; emailed: boolean };
 type Draft = {
@@ -48,6 +49,10 @@ export default function WebSendPage() {
   };
   const [copied, setCopied] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const listInput = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState("");
 
   // Remember the sender's email across tabs and visits, so Sent/Drafts don't ask again.
   useEffect(() => {
@@ -73,8 +78,74 @@ export default function WebSendPage() {
 
   const setSigner = (i: number, patch: Partial<Signer>) =>
     setSigners((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
-  const addSigner = () => setSigners((prev) => (prev.length < 10 ? [...prev, { name: "", email: "" }] : prev));
+  const addSigner = () => setSigners((prev) => (prev.length < MAX_SIGNERS ? [...prev, { name: "", email: "" }] : prev));
   const removeSigner = (i: number) => setSigners((prev) => prev.filter((_, j) => j !== i));
+
+  // ---- Bulk add: merge a parsed list into the signer rows (dedupe, cap) ----
+  const mergeSigners = (incoming: Signer[]): { added: number; capped: boolean } => {
+    let added = 0;
+    let capped = false;
+    setSigners((prev) => {
+      const existing = prev.filter((s) => s.name.trim() || s.email.trim());
+      const seen = new Set(existing.map((s) => (s.email.trim() || s.name.trim()).toLowerCase()));
+      const merged = [...existing];
+      for (const s of incoming) {
+        const name = (s.name || "").trim();
+        const email = (s.email || "").trim();
+        const key = (email || name).toLowerCase();
+        if (!key || seen.has(key)) continue;
+        if (merged.length >= MAX_SIGNERS) { capped = true; break; }
+        seen.add(key);
+        merged.push({ name, email });
+        added++;
+      }
+      return merged.length ? merged : [{ name: "", email: "" }];
+    });
+    return { added, capped };
+  };
+
+  const importFile = async (f: File) => {
+    setError(null); setNotice(null); setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", f);
+      const r = await fetch("/api/web/parse-signers", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Couldn't read that file.");
+      const { added, capped } = mergeSigners(j.signers ?? []);
+      if (added === 0) setNotice("Those signers were already in the list.");
+      else setNotice(`Added ${added} signer${added === 1 ? "" : "s"} from “${f.name}”.${capped || j.truncated ? ` List is capped at ${MAX_SIGNERS}.` : ""}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't read that file.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Client-side parse for the paste box (names + emails, any order).
+  const parsePasteText = (text: string): Signer[] => {
+    const EMAIL = /[^\s@,;<>()]+@[^\s@,;<>()]+\.[^\s@,;<>()]+/;
+    const out: Signer[] = [];
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || /^name\s*[,;\t]\s*e-?mail/i.test(line)) continue;
+      const parts = line.split(/[,;\t]/).map((p) => p.trim()).filter(Boolean);
+      const emailPart = parts.find((p) => EMAIL.test(p)) ?? (EMAIL.test(line) ? line.match(EMAIL)![0] : "");
+      const email = emailPart ? emailPart.match(EMAIL)![0] : "";
+      let name = parts.filter((p) => !EMAIL.test(p)).join(" ").trim();
+      if (!name && email) name = email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      if (name || email) out.push({ name, email });
+    }
+    return out;
+  };
+
+  const applyPaste = () => {
+    const parsed = parsePasteText(pasteText);
+    if (parsed.length === 0) { setError("Couldn't find any names or emails in what you pasted."); return; }
+    const { added, capped } = mergeSigners(parsed);
+    setPasteText(""); setShowPaste(false); setError(null);
+    setNotice(added ? `Added ${added} signer${added === 1 ? "" : "s"}.${capped ? ` List is capped at ${MAX_SIGNERS}.` : ""}` : "Those signers were already in the list.");
+  };
 
   const cleanSigners = () => signers.map((s) => ({ name: s.name.trim(), email: s.email.trim() })).filter((s) => s.name);
 
@@ -568,8 +639,43 @@ export default function WebSendPage() {
             {signers.length > 1 && <button className="rm" onClick={() => removeSigner(i)} aria-label="Remove signer">✕</button>}
           </div>
         ))}
-        {signers.length < 10 && <button className="ghost" onClick={addSigner}>+ Add another signer</button>}
-        <p className="field-hint" style={{ marginTop: 10 }}>No email? Leave it blank — you&apos;ll get a link to share with them yourself.</p>
+        {signers.length < MAX_SIGNERS && <button className="ghost" onClick={addSigner}>+ Add another signer</button>}
+
+        <div className="bulk-add">
+          <span className="bulk-or">or add many at once</span>
+          <div className="bulk-btns">
+            <button className="ghost" onClick={() => listInput.current?.click()} disabled={importing}>
+              {importing ? "Reading…" : "⬆ Upload a list (CSV or Excel)"}
+            </button>
+            <button className="ghost" onClick={() => setShowPaste((v) => !v)}>
+              {showPaste ? "Close paste box" : "Paste a list"}
+            </button>
+          </div>
+          <input
+            ref={listInput}
+            type="file"
+            accept=".csv,.xlsx,.xlsm,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ""; }}
+          />
+        </div>
+
+        {showPaste && (
+          <div className="field" style={{ marginTop: 10 }}>
+            <textarea
+              className="field-input"
+              rows={5}
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder={"Paste one person per line, e.g.\nTunde Bello, tunde@email.com\nAda Okeke, ada@email.com"}
+            />
+            <button className="ghost" style={{ marginTop: 8 }} onClick={applyPaste}>Add these signers</button>
+          </div>
+        )}
+
+        <p className="field-hint" style={{ marginTop: 10 }}>
+          Upload a CSV or Excel file with a <strong>name</strong> and <strong>email</strong> column — any order works. Up to {MAX_SIGNERS} signers. No email? Leave it blank and you&apos;ll get a link to share yourself.
+        </p>
       </div>
 
       <div className="card">
