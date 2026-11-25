@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin, BUCKET } from "@/lib/supabase";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 async function loadByToken(token: string) {
   const db = supabaseAdmin();
@@ -36,12 +36,16 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     (a: { sign_order: number }, b: { sign_order: number }) => a.sign_order - b.sign_order
   );
 
+  const batchSigners = (tok.batch as { mode?: string; signers?: unknown[] } | null)?.signers;
+  const batchCount = Array.isArray(batchSigners) ? batchSigners.length : 0;
+
   return NextResponse.json({
     filename: document.filename,
     pdfUrl: pdfUrl?.signedUrl ?? null,
     signers: signers.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })),
     multiSigner: signers.length > 1,
     isWeb: !!request.sender_email,
+    batchCount,
   });
 }
 
@@ -93,6 +97,46 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       h: clamp01(f.h),
       fill_mode: f.type === "date" ? (f.fillMode === "signer" ? "signer" : "auto") : "auto",
     }));
+
+  // ---- BULK "send individually" with placement ----
+  // The token carries the whole signer batch. Replicate the placed fields to one
+  // independent copy per signer, deliver each, then discard the template request.
+  const batch = tok.batch as { mode?: string; signers?: { name?: string; email?: string | null }[] } | null;
+  if (batch?.mode === "individual" && Array.isArray(batch.signers) && batch.signers.length > 0) {
+    const { createRequestPending } = await import("@/lib/requests");
+    const { deliverPlacedWebRequest } = await import("@/lib/web");
+    const fieldSpecs = rows.map((r) => ({ type: r.type, page: r.page, x: r.x, y: r.y, w: r.w, h: r.h, fill_mode: r.fill_mode }));
+
+    let count = 0;
+    for (const person of batch.signers) {
+      const name = String(person.name ?? "").trim();
+      const email = person.email ? String(person.email).trim().toLowerCase() : null;
+      if (!name && !email) continue;
+      try {
+        const reqId = await createRequestPending({
+          documentId: request.document_id,
+          senderName: request.sender_name,
+          senderEmail: request.sender_email,
+          message: request.message ?? null,
+          signers: [{ name: name || (email ? email.split("@")[0] : "Signer"), email, phone: `web:${email ?? "anon"}` }],
+          aiSummary: request.ai_summary ?? null, // reuse template's summary — no re-summarise
+        });
+        await db.from("doc_fields").insert(fieldSpecs.map((f) => ({ request_id: reqId, signer_id: null, ...f })));
+        await db.from("sign_requests").update({ placement: "done" }).eq("id", reqId);
+        await deliverPlacedWebRequest(reqId);
+        count++;
+      } catch (e) {
+        console.error("PLACE(bulk): copy failed —", e instanceof Error ? e.message : e);
+      }
+    }
+
+    // Retire the template request + token (it was only ever for placement).
+    await db.from("placement_tokens").update({ used_at: new Date().toISOString() }).eq("token", params.token);
+    await db.from("signers").delete().eq("request_id", request.id);
+    await db.from("sign_requests").delete().eq("id", request.id);
+
+    return NextResponse.json({ ok: true, web: true, bulk: true, count });
+  }
 
   const { error } = await db.from("doc_fields").insert(rows);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

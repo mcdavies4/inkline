@@ -271,7 +271,7 @@ export default function WebSendPage() {
     setBusy(true);
     try {
       let r: Response;
-      if (draftId) {
+      if (draftId && sendMode !== "individual") {
         const ok = await saveDraft(true);
         if (!ok) { setBusy(false); return; }
         r = await fetch(`/api/web/draft/${draftId}`, {
@@ -280,7 +280,9 @@ export default function WebSendPage() {
           body: JSON.stringify({ email: senderEmail.trim().toLowerCase(), place_first: "1" }),
         });
       } else {
-        r = await fetch("/api/web/send", { method: "POST", body: buildForm({ place_first: "1" }) });
+        const extra: Record<string, string> = { place_first: "1" };
+        if (sendMode === "individual") extra.send_mode = "individual";
+        r = await fetch("/api/web/send", { method: "POST", body: buildForm(extra) });
       }
       const j = await r.json();
       if (r.status === 402 && j.needsSubscription) { setCheckout(plansFrom(j)); return; }
@@ -735,12 +737,15 @@ export default function WebSendPage() {
 
       {sendMode === "individual" && file && signers.filter((s) => s.name.trim()).length > 1 ? (
         <>
-          <button className="primary" onClick={sendIndividual} disabled={busy || savingDraft}>
-            {busy ? "Sending…" : `Send ${cleanSigners().length} separate copies →`}
+          <button className="primary" onClick={placeThenSend} disabled={busy || savingDraft}>
+            {busy ? "Opening…" : "Choose where they sign →"}
           </button>
           <p className="field-hint" style={{ textAlign: "center", margin: "0 0 2px" }}>
-            Each person gets their own copy and taps where to sign on it.
+            Place the fields once — we apply them to all {cleanSigners().length} copies.
           </p>
+          <button className="ghost" onClick={sendIndividual} disabled={busy || savingDraft}>
+            Or just send {cleanSigners().length} copies — they pick the spot
+          </button>
         </>
       ) : file || draftId ? (
         <>

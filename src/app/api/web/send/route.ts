@@ -84,6 +84,25 @@ export async function POST(req: NextRequest) {
   try {
     const doc = await createDocument(Buffer.from(await file.arrayBuffer()), file.name);
 
+    if (individual && placeFirst) {
+      // Place fields ONCE on a throwaway template request, then (on save) the
+      // /place editor replicates them to one independent copy per signer.
+      const templateId = await createRequestPending({
+        documentId: doc.id,
+        senderName,
+        senderEmail,
+        message,
+        signers: [{ name: "Signer", email: null, phone: "web:template" }],
+        flow: "parallel",
+      });
+      const token = randomBytes(24).toString("base64url");
+      const { error: tokErr } = await supabaseAdmin()
+        .from("placement_tokens")
+        .insert({ token, request_id: templateId, batch: { mode: "individual", signers } });
+      if (tokErr) throw new Error(tokErr.message);
+      return NextResponse.json({ ok: true, placeToken: token, filename: doc.filename });
+    }
+
     if (individual) {
       // One summary for the whole batch, then a separate copy per signer.
       const summary = await summariseDocumentById(doc.id);

@@ -32,7 +32,7 @@ const FIELD_SIZE: Record<FieldType, { w: number; h: number }> = {
 
 export default function PlacePage() {
   const { token } = useParams<{ token: string }>();
-  const [meta, setMeta] = useState<{ filename: string; pdfUrl: string; signers: Signer[]; multiSigner: boolean; isWeb?: boolean } | null>(null);
+  const [meta, setMeta] = useState<{ filename: string; pdfUrl: string; signers: Signer[]; multiSigner: boolean; isWeb?: boolean; batchCount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
   const [activeType, setActiveType] = useState<FieldType>("signature");
@@ -40,6 +40,7 @@ export default function PlacePage() {
   const [pages, setPages] = useState<{ dataUrl: string; ratio: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [sentCount, setSentCount] = useState(0);
   const [rendering, setRendering] = useState(true);
   const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
 
@@ -194,6 +195,7 @@ export default function PlacePage() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Couldn't save. Please try again.");
+      if (typeof j.count === "number") setSentCount(j.count);
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save. Please try again.");
@@ -219,7 +221,9 @@ export default function PlacePage() {
           <div className="tick">✓</div>
           <h1>Sent — fields placed</h1>
           <p className="mute">
-            {meta?.isWeb
+            {sentCount > 1
+              ? `Sent to ${sentCount} people — each gets their own copy with the signature fields exactly where you placed them. They'll just tap each field and sign.`
+              : meta?.isWeb
               ? "Your document is on its way to your signers by email, with the signature fields exactly where you put them. They'll just tap each field and sign."
               : "Your document is on its way to your signers, with the fields exactly where you put them. You can close this page and head back to WhatsApp."}
           </p>
@@ -239,6 +243,12 @@ export default function PlacePage() {
         <span className="l-brand">Inkline</span>
         <span className="place-file">{meta.filename}</span>
       </header>
+
+      {(meta.batchCount ?? 0) > 1 && (
+        <div className="place-batch">
+          Placing for <strong>{meta.batchCount} separate copies</strong> — each person gets these same fields on their own document.
+        </div>
+      )}
 
       <div className="place-hint">
         {fields.length === 0
