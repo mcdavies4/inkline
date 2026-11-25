@@ -24,6 +24,88 @@ export interface Post {
 const AUTHOR = "Emeka Azubuike";
 
 export const POSTS: Post[] = [
+  // ------------------------------------------------------------------ 0 (newest)
+  {
+    slug: "how-to-send-a-document-for-signature",
+    title: "How to Send a Document for Signature (Free, No Account Needed)",
+    description:
+      "A step-by-step guide to sending any PDF for signature: add signers, mark where they sign, and get the signed copy back — free, with no account for your signer.",
+    keyword: "how to send a document for signature",
+    date: "2026-11-25",
+    readingMins: 6,
+    excerpt:
+      "Most guides tell you how to sign. This one is for the other side — how to send a document and actually get it signed, in under a minute, with no account for the signer.",
+    bodyHtml: `
+<p>There are two sides to e-signing. Plenty of guides explain how to <em>sign</em> a document someone sent you. This one is about the harder half: you have a contract, an offer letter, or an agreement, and you need <strong>someone else to sign it</strong> — ideally without emailing a PDF back and forth, printing anything, or making them create an account.</p>
+<p>Here's the whole process, start to finish, and the few things that make a signed document actually hold up.</p>
+
+<h2>The 5 steps to send a document for signature</h2>
+<p>Whatever tool you use, sending for signature follows the same shape. With <a href="/app">Inkline</a> it looks like this:</p>
+<ol>
+<li><strong>Upload the document.</strong> Attach the PDF you want signed. If it's a Word file, export it to PDF first — that locks the layout so it looks the same for everyone.</li>
+<li><strong>Add who needs to sign.</strong> Enter each signer's name and email. You can add more than one person — a tenant and a landlord, two business partners, a whole board — and everyone signs the same document.</li>
+<li><strong>Mark where they sign.</strong> Tap the spot on the page where each person's signature goes. This is the step most people skip and later regret: when the signer opens the document, their signature box is already sitting in the right place, so there's no guessing and nothing lands in the wrong spot.</li>
+<li><strong>Send it.</strong> Each signer gets a link — by email, or one you can share on WhatsApp, Telegram, or anywhere. No attachment to download, no software to install.</li>
+<li><strong>Get the signed copy back.</strong> The moment everyone has signed, you and your signers all receive the completed document, with a record of who signed and when.</li>
+</ol>
+
+<h2>Why "where they sign" matters</h2>
+<p>The single biggest cause of a messy signing is leaving the signer to work out where to put their signature. They scroll a three-page contract, aren't sure which line is theirs, and either sign the wrong place or give up and message you asking.</p>
+<p>Marking the signature spot before you send removes all of that. The signer opens the link, sees a clearly highlighted box that says "sign here," taps it, draws their signature with a finger, and they're done. On a phone the whole thing takes about 20 seconds. If you'd rather not place the box yourself, you can still just send it and let the signer choose the spot — but for anything with a specific signature line, placing it is worth the extra few seconds.</p>
+
+<h2>Sending to more than one person</h2>
+<p>Most real documents need more than one signature. A tenancy agreement needs the tenant and the landlord. A partnership deal needs every partner. When you send for signature, add each person as a separate signer, and give each one their own signature spot on the page so it's obvious who signs where.</p>
+<p>A good signing tool then tracks the whole thing for you: who has signed, who hasn't, and a one-tap way to nudge the person holding things up. You're not left wondering whether your email got buried — you can see it.</p>
+
+<h2>What makes the signed document hold up</h2>
+<p>A signature on its own is just a picture. What gives a signed document weight if it's ever questioned is the <strong>record around it</strong>:</p>
+<ul>
+<li><strong>Who signed</strong> — tied to an email, a device, a link that was sent to that specific person.</li>
+<li><strong>When</strong> — a timestamp for each signature.</li>
+<li><strong>That nothing changed after</strong> — the finished file is the one everyone agreed to, not an edited version.</li>
+</ul>
+<p>Any serious signing tool keeps this automatically, which is why sending for signature through a proper tool is safer than emailing a PDF and asking someone to "sign and send it back." We go deeper on the legal side here: <a href="/blog/is-electronic-signature-legal-in-nigeria">Is an electronic signature legal in Nigeria?</a></p>
+
+<h2>Send it clean — no clutter on the file</h2>
+<p>One thing people quietly hate about some signing tools: they staple a noisy certificate page onto the front of your document. When you send a contract for signature, the copy that comes back should be <em>your</em> document — the same pages you sent, with the signatures added where they belong, and nothing else bolted on. The signing record is kept separately, not stamped across your agreement.</p>
+
+<h2>What you'll need before you send</h2>
+<ul>
+<li>The document as a <strong>PDF</strong>.</li>
+<li>Each signer's <strong>name and email</strong> (or a way to send them a link).</li>
+<li>Thirty seconds to drop a signature box on each signing spot.</li>
+</ul>
+<p>That's it. No scanner, no printer, no app for the person signing.</p>
+
+<h2>Send your first document</h2>
+<p>If you need something signed today, <a href="/app">send it with Inkline</a>: upload the PDF, add your signers, tap where each person signs, and send. Your signer opens a link, signs from their phone with no account, and everyone gets the finished copy back. It's free for 7 days, and the signer never pays or signs up.</p>
+
+<p style="font-size:14px;color:#6b7768"><em>This article is general information, not legal advice. For high-value or specialised documents, check the specific requirement or speak to a qualified lawyer.</em></p>
+`,
+    faq: [
+      {
+        q: "How do I send a document for someone to sign?",
+        a: "Upload the PDF, add the signer's name and email, mark where they should sign, and send. They get a link, open it, sign from their phone or computer, and you both receive the signed copy. With Inkline the signer needs no account.",
+      },
+      {
+        q: "Can I send one document to multiple signers?",
+        a: "Yes. Add each person as a separate signer and give each one their own signature spot on the page. Everyone signs the same document, and you can see who has signed and remind anyone who hasn't.",
+      },
+      {
+        q: "Does the person signing need an account or an app?",
+        a: "No. With Inkline the signer just opens the link you send, taps where their signature goes, and draws it with a finger. No download, no sign-up, no payment on their side.",
+      },
+      {
+        q: "Is a document signed this way legally valid?",
+        a: "For most business documents, yes. Electronic signatures are legally recognised in Nigeria and most countries. What matters is a record of who signed and when, which a proper signing tool keeps for you automatically.",
+      },
+    ],
+    related: [
+      "how-to-sign-a-pdf-on-your-phone",
+      "best-docusign-alternatives-nigeria",
+      "is-electronic-signature-legal-in-nigeria",
+    ],
+  },
   // ------------------------------------------------------------------ 1
   {
     slug: "is-electronic-signature-legal-in-nigeria",
