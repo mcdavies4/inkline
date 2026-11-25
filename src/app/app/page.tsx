@@ -53,6 +53,7 @@ export default function WebSendPage() {
   const [importing, setImporting] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [sendMode, setSendMode] = useState<"together" | "individual">("together");
 
   // Remember the sender's email across tabs and visits, so Sent/Drafts don't ask again.
   useEffect(() => {
@@ -150,7 +151,7 @@ export default function WebSendPage() {
   const cleanSigners = () => signers.map((s) => ({ name: s.name.trim(), email: s.email.trim() })).filter((s) => s.name);
 
   const resetCompose = () => {
-    setSenderName(""); setMessage(""); setCc(""); setSigners([{ name: "", email: "" }]);
+    setSenderName(""); setMessage(""); setCc(""); setSigners([{ name: "", email: "" }]); setSendMode("together");
     setFile(null); setDraftId(null); setExistingFile(null); setNotice(null); setError(null);
     if (fileInput.current) fileInput.current.value = "";
   };
@@ -223,6 +224,29 @@ export default function WebSendPage() {
       } else {
         r = await fetch("/api/web/send", { method: "POST", body: buildForm() });
       }
+      const j = await r.json();
+      if (r.status === 402 && j.needsSubscription) { setCheckout(plansFrom(j)); return; }
+      if (!r.ok) throw new Error(j.error ?? "Something went wrong. Please try again.");
+      setSent({ filename: j.filename, signers: j.signers ?? [] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Send each signer their own separate copy (mail-merge) ----
+  const sendIndividual = async () => {
+    if (busy) return;
+    setError(null); setNotice(null); setCheckout(null);
+    if (!senderName.trim()) return setError("Please add your name.");
+    if (!senderEmail.trim()) return setError("Please add your email so we can send you the signed copies.");
+    if (cleanSigners().length === 0) return setError("Add at least one signer.");
+    if (!file) return setError("Please attach a PDF to send.");
+
+    setBusy(true);
+    try {
+      const r = await fetch("/api/web/send", { method: "POST", body: buildForm({ send_mode: "individual" }) });
       const j = await r.json();
       if (r.status === 402 && j.needsSubscription) { setCheckout(plansFrom(j)); return; }
       if (!r.ok) throw new Error(j.error ?? "Something went wrong. Please try again.");
@@ -676,6 +700,22 @@ export default function WebSendPage() {
         <p className="field-hint" style={{ marginTop: 10 }}>
           Upload a CSV or Excel file with a <strong>name</strong> and <strong>email</strong> column — any order works. Up to {MAX_SIGNERS} signers. No email? Leave it blank and you&apos;ll get a link to share yourself.
         </p>
+
+        {signers.filter((s) => s.name.trim()).length > 1 && (
+          <div className="send-mode">
+            <span className="bulk-or">How should they sign?</span>
+            <div className="mode-opts">
+              <button className={`mode-opt ${sendMode === "together" ? "on" : ""}`} onClick={() => setSendMode("together")}>
+                <strong>One shared document</strong>
+                <span>Everyone signs the same file</span>
+              </button>
+              <button className={`mode-opt ${sendMode === "individual" ? "on" : ""}`} onClick={() => setSendMode("individual")}>
+                <strong>Separate copies</strong>
+                <span>Each person signs their own</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -693,7 +733,16 @@ export default function WebSendPage() {
       {notice && <p className="mute" style={{ margin: 0, color: "var(--seal)" }}>{notice}</p>}
       {error && <p className="err" style={{ margin: 0 }}>{error}</p>}
 
-      {file || draftId ? (
+      {sendMode === "individual" && file && signers.filter((s) => s.name.trim()).length > 1 ? (
+        <>
+          <button className="primary" onClick={sendIndividual} disabled={busy || savingDraft}>
+            {busy ? "Sending…" : `Send ${cleanSigners().length} separate copies →`}
+          </button>
+          <p className="field-hint" style={{ textAlign: "center", margin: "0 0 2px" }}>
+            Each person gets their own copy and taps where to sign on it.
+          </p>
+        </>
+      ) : file || draftId ? (
         <>
           <button className="primary" onClick={placeThenSend} disabled={busy || savingDraft}>
             {busy ? "Opening…" : "Choose where they sign →"}

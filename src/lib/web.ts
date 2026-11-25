@@ -90,6 +90,7 @@ export async function deliverWebRequest(input: {
   ccEmails: string[];
   signers: WebSigner[];
   accountDocsUsed: number;
+  aiSummary?: string | null;
 }): Promise<{ requestId: string; signers: { name: string; email: string | null; signUrl: string; emailed: boolean }[] }> {
   const requestId = await createRequestPending({
     documentId: input.documentId,
@@ -99,6 +100,7 @@ export async function deliverWebRequest(input: {
     message: input.message,
     signers: input.signers.map((s) => ({ name: s.name, email: s.email, phone: `web:${s.email ?? "anon"}` })),
     flow: "parallel",
+    ...(input.aiSummary !== undefined ? { aiSummary: input.aiSummary } : {}),
   });
 
   const db = supabaseAdmin();
@@ -132,6 +134,42 @@ export async function deliverWebRequest(input: {
     .then(() => {}, () => {});
 
   return { requestId, signers: results };
+}
+
+/**
+ * "Send individually" (mail-merge): each signer gets their OWN separate copy of
+ * the same document — an independent request + signing link, so they sign on
+ * their own without seeing anyone else. The AI summary is computed once by the
+ * caller and reused across every copy. Returns a flat per-copy result list.
+ */
+export async function deliverWebRequestsIndividually(input: {
+  documentId: string;
+  filename: string;
+  senderName: string;
+  senderEmail: string;
+  message: string | null;
+  signers: WebSigner[];
+  accountDocsUsed: number;
+  aiSummary: string | null;
+}): Promise<{ count: number; signers: { name: string; email: string | null; signUrl: string; emailed: boolean }[] }> {
+  const out: { name: string; email: string | null; signUrl: string; emailed: boolean }[] = [];
+  let i = 0;
+  for (const s of input.signers) {
+    const { signers: res } = await deliverWebRequest({
+      documentId: input.documentId,
+      filename: input.filename,
+      senderName: input.senderName,
+      senderEmail: input.senderEmail,
+      message: input.message,
+      ccEmails: [], // don't CC the whole list on every single copy
+      signers: [s],
+      accountDocsUsed: input.accountDocsUsed + i,
+      aiSummary: input.aiSummary,
+    });
+    out.push(...res);
+    i++;
+  }
+  return { count: out.length, signers: out };
 }
 
 /**

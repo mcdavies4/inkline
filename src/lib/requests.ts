@@ -55,6 +55,27 @@ export interface CreateRequestInput {
   flow?: "sequential" | "parallel";
   requireOtp?: boolean;
   mode?: "signature" | "quick_approval";
+  /**
+   * Pre-computed AI summary. When provided (including null), the summary is NOT
+   * recomputed — used by bulk "send individually" so one summary is reused across
+   * every copy instead of re-summarising the same PDF N times.
+   */
+  aiSummary?: string | null;
+}
+
+/** Downloads a stored document and returns its AI summary (best-effort, null on failure). */
+export async function summariseDocumentById(documentId: string): Promise<string | null> {
+  const db = supabaseAdmin();
+  const { data: doc } = await db.from("documents").select("storage_path").eq("id", documentId).single();
+  if (!doc) return null;
+  try {
+    const { data: file } = await db.storage.from(BUCKET).download(doc.storage_path);
+    if (!file) return null;
+    const text = await extractPdfText(new Uint8Array(await file.arrayBuffer()));
+    return await summariseDocument(text);
+  } catch {
+    return null;
+  }
 }
 
 /** Creates the request + signers but does NOT deliver. Returns the request id. */
@@ -70,15 +91,18 @@ export async function createRequestPending(input: CreateRequestInput): Promise<s
     .single();
   if (docErr || !doc) throw new Error("Document not found");
 
-  let aiSummary: string | null = null;
-  try {
-    const { data: file } = await db.storage.from(BUCKET).download(doc.storage_path);
-    if (file) {
-      const text = await extractPdfText(new Uint8Array(await file.arrayBuffer()));
-      aiSummary = await summariseDocument(text);
+  // Caller may supply a pre-computed summary (bulk send reuses one across copies).
+  let aiSummary: string | null = input.aiSummary ?? null;
+  if (input.aiSummary === undefined) {
+    try {
+      const { data: file } = await db.storage.from(BUCKET).download(doc.storage_path);
+      if (file) {
+        const text = await extractPdfText(new Uint8Array(await file.arrayBuffer()));
+        aiSummary = await summariseDocument(text);
+      }
+    } catch {
+      /* summary optional */
     }
-  } catch {
-    /* summary optional */
   }
 
   // Only reference the web-only columns (sender_email / signers.email) when a

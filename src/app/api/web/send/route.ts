@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { createDocument, createRequestPending } from "@/lib/requests";
+import { createDocument, createRequestPending, summariseDocumentById } from "@/lib/requests";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createStripeCheckout, PRICING } from "@/lib/billing";
-import { webSendAllowed, validateCompose, parseSigners, parseCcEmails, deliverWebRequest } from "@/lib/web";
+import { webSendAllowed, validateCompose, parseSigners, parseCcEmails, deliverWebRequest, deliverWebRequestsIndividually } from "@/lib/web";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -77,10 +77,28 @@ export async function POST(req: NextRequest) {
   // before it goes out. We create the request but hold delivery; the /place
   // editor saves the fields and triggers the email send.
   const placeFirst = String(form.get("place_first") ?? "") === "1";
+  // "individual" = each signer gets their own separate copy (mail-merge).
+  const individual = String(form.get("send_mode") ?? "") === "individual";
 
   // ---- Store the PDF + create and deliver the request ----
   try {
     const doc = await createDocument(Buffer.from(await file.arrayBuffer()), file.name);
+
+    if (individual) {
+      // One summary for the whole batch, then a separate copy per signer.
+      const summary = await summariseDocumentById(doc.id);
+      const { count, signers: results } = await deliverWebRequestsIndividually({
+        documentId: doc.id,
+        filename: doc.filename,
+        senderName,
+        senderEmail,
+        message,
+        signers,
+        accountDocsUsed: gate.account.documents_used,
+        aiSummary: summary,
+      });
+      return NextResponse.json({ ok: true, bulk: true, count, filename: doc.filename, signers: results });
+    }
 
     if (placeFirst) {
       const requestId = await createRequestPending({
